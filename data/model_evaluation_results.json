@@ -1,0 +1,66 @@
+{
+    "Severity_encoded": {
+        "Naive Bayes": {
+            "Accuracy": 0.26,
+            "Precision": 0.2514524345931928,
+            "Recall": 0.26,
+            "F1-Score": 0.24731519545677363
+        },
+        "Logistic Regression": {
+            "Accuracy": 0.25666666666666665,
+            "Precision": 0.247915550667443,
+            "Recall": 0.25666666666666665,
+            "F1-Score": 0.2372997972095534
+        },
+        "Decision Tree": {
+            "Accuracy": 0.26,
+            "Precision": 0.2514524345931928,
+            "Recall": 0.26,
+            "F1-Score": 0.24731519545677363
+        },
+        "Random Forest": {
+            "Accuracy": 0.25333333333333335,
+            "Precision": 0.19619765375044437,
+            "Recall": 0.25333333333333335,
+            "F1-Score": 0.21000732720019538
+        },
+        "SVM": {
+            "Accuracy": 0.25666666666666665,
+            "Precision": 0.247915550667443,
+            "Recall": 0.25666666666666665,
+            "F1-Score": 0.2372997972095534
+        }
+    },
+    "Priority_encoded": {
+        "Naive Bayes": {
+            "Accuracy": 0.17666666666666667,
+            "Precision": 0.17199352127835735,
+            "Recall": 0.17666666666666667,
+            "F1-Score": 0.16727253776591527
+        },
+        "Logistic Regression": {
+            "Accuracy": 0.17666666666666667,
+            "Precision": 0.1963040122327824,
+            "Recall": 0.17666666666666667,
+            "F1-Score": 0.16662632358533996
+        },
+        "Decision Tree": {
+            "Accuracy": 0.17666666666666667,
+            "Precision": 0.1963040122327824,
+            "Recall": 0.17666666666666667,
+            "F1-Score": 0.16662632358533996
+        },
+        "Random Forest": {
+            "Accuracy": 0.18,
+            "Precision": 0.1794240768339129,
+            "Recall": 0.18,
+            "F1-Score": 0.16834433723458114
+        },
+        "SVM": {
+            "Accuracy": 0.17666666666666667,
+            "Precision": 0.1963040122327824,
+            "Recall": 0.17666666666666667,
+            "F1-Score": 0.16662632358533996
+        }
+    }
+}
