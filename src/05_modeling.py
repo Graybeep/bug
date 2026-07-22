@@ -79,6 +79,7 @@ def train_and_evaluate():
         targets['bug_category_encoded'] = 'Bug Category'
 
     results = {}
+    saved_severity_model = None  # Track separately to avoid overwrite by later targets
 
     for encoded_col, label in targets.items():
         if encoded_col not in df.columns:
@@ -128,9 +129,14 @@ def train_and_evaluate():
         print(f"\n  Best model for {label}: {best_name}  (F1={best_f1:.4f})")
         print(f"  Saved to: {model_path}")
 
-    # Also save as best_priority_model for predict script compatibility
-    if 'severity_encoded' in df.columns:
-        joblib.dump(best_model, 'models/best_priority_model.pkl')
+        # Capture severity model separately before it gets overwritten
+        if encoded_col == 'severity_encoded':
+            saved_severity_model = best_model
+
+    # Save severity model under alternative name for predict script compatibility
+    if saved_severity_model is not None:
+        joblib.dump(saved_severity_model, 'models/best_priority_model.pkl')
+        print("  Also saved as: models/best_priority_model.pkl (predict script alias)")
 
     json_path = 'data/model_evaluation_results.json'
     with open(json_path, 'w') as f:
