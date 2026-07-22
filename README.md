@@ -1,6 +1,29 @@
 # 🐛 Bug Management System — Milestone 2
 
-An end-to-end machine learning pipeline for collecting, preprocessing, visualizing, and predicting software bug severity and priority, simulating real-world data from platforms like **Bugzilla**, **JIRA**, and **GitHub**.
+An end-to-end machine learning pipeline for collecting, preprocessing, visualizing, and predicting software bug severity, simulating real-world data from platforms like **Bugzilla**, **JIRA**, and **GitHub**.
+
+---
+
+## ⚠️ Dataset Setup (Required Before Running)
+
+The dataset is **not included** in this repository (too large for GitHub). You must download it manually from Kaggle.
+
+### Steps:
+1. Go to Kaggle and search for **"50k Bug Dataset"** or use the direct link:
+   👉 **[https://www.kaggle.com/datasets/search?q=50k+bug+dataset](https://www.kaggle.com/datasets/search?q=50k+bug+dataset)**
+
+2. Download the file — it will be named **`bug_dataset_50k.csv`**
+
+3. Place it inside the `data/` folder of this project:
+   ```
+   BugManagement/
+   └── data/
+       └── bug_dataset_50k.csv   ← place it here
+   ```
+
+4. Then run the scripts in order (see **How to Run** below)
+
+> The `data/` and `models/` directories are gitignored. All processed files and trained models are generated automatically when you run the pipeline.
 
 ---
 
