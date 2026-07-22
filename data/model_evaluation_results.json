@@ -1,66 +1,66 @@
 {
     "Severity": {
         "Naive Bayes": {
-            "Accuracy": 0.22,
-            "Precision": 0.2072,
-            "Recall": 0.22,
-            "F1-Score": 0.2035
+            "Accuracy": 0.2555,
+            "Precision": 0.2558,
+            "Recall": 0.2555,
+            "F1-Score": 0.2487
         },
         "Logistic Regression": {
-            "Accuracy": 0.22,
-            "Precision": 0.2091,
-            "Recall": 0.22,
-            "F1-Score": 0.2008
+            "Accuracy": 0.256,
+            "Precision": 0.2566,
+            "Recall": 0.256,
+            "F1-Score": 0.2464
         },
         "Decision Tree": {
-            "Accuracy": 0.22,
-            "Precision": 0.2091,
-            "Recall": 0.22,
-            "F1-Score": 0.2008
+            "Accuracy": 0.2592,
+            "Precision": 0.2605,
+            "Recall": 0.2592,
+            "F1-Score": 0.247
         },
         "Random Forest": {
-            "Accuracy": 0.22,
-            "Precision": 0.2091,
-            "Recall": 0.22,
-            "F1-Score": 0.2008
+            "Accuracy": 0.256,
+            "Precision": 0.2581,
+            "Recall": 0.256,
+            "F1-Score": 0.2461
         },
-        "SVM": {
-            "Accuracy": 0.22,
-            "Precision": 0.2091,
-            "Recall": 0.22,
-            "F1-Score": 0.2008
+        "SVM (Linear)": {
+            "Accuracy": 0.2602,
+            "Precision": 0.195,
+            "Recall": 0.2602,
+            "F1-Score": 0.2147
         }
     },
-    "Priority": {
+    "Bug Category": {
         "Naive Bayes": {
-            "Accuracy": 0.24,
-            "Precision": 0.2444,
-            "Recall": 0.24,
-            "F1-Score": 0.2383
+            "Accuracy": 1.0,
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1-Score": 1.0
         },
         "Logistic Regression": {
-            "Accuracy": 0.2133,
-            "Precision": 0.1394,
-            "Recall": 0.2133,
-            "F1-Score": 0.1553
+            "Accuracy": 1.0,
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1-Score": 1.0
         },
         "Decision Tree": {
-            "Accuracy": 0.2433,
-            "Precision": 0.1521,
-            "Recall": 0.2433,
-            "F1-Score": 0.1804
+            "Accuracy": 1.0,
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1-Score": 1.0
         },
         "Random Forest": {
-            "Accuracy": 0.2433,
-            "Precision": 0.1521,
-            "Recall": 0.2433,
-            "F1-Score": 0.1804
+            "Accuracy": 1.0,
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1-Score": 1.0
         },
-        "SVM": {
-            "Accuracy": 0.2133,
-            "Precision": 0.1394,
-            "Recall": 0.2133,
-            "F1-Score": 0.1553
+        "SVM (Linear)": {
+            "Accuracy": 1.0,
+            "Precision": 1.0,
+            "Recall": 1.0,
+            "F1-Score": 1.0
         }
     }
 }

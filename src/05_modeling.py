@@ -1,16 +1,16 @@
 # ==============================================================================
 # 05_modeling.py
 # Task 6: Training and Testing ML Models
-# Trains 5 models to predict Severity and Priority from bug descriptions.
+# Trains 5 models to predict Severity from bug descriptions.
 # Input:  data/bug_reports_processed.csv
 # Output: models/*.pkl  |  data/model_evaluation_results.json
 # ==============================================================================
 
 import pandas as pd
-import json
-import os
-import sys
-import joblib
+import json, os, sys, joblib
+
+import warnings
+warnings.filterwarnings('ignore')
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -21,7 +21,8 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def train_and_evaluate():
@@ -30,7 +31,7 @@ def train_and_evaluate():
     print("=" * 60)
 
     # ------------------------------------------------------------------
-    # 1. Load preprocessed data
+    # 1. Load data
     # ------------------------------------------------------------------
     try:
         df = pd.read_csv('data/bug_reports_processed.csv')
@@ -38,40 +39,50 @@ def train_and_evaluate():
         print("  [ERROR] Run 02_preprocessing.py first.")
         return
 
-    print(f"\n  Loaded processed dataset  |  {len(df)} records")
+    print(f"\n  Loaded processed dataset  |  {len(df):,} records")
 
     # ------------------------------------------------------------------
-    # 2. Feature extraction — TF-IDF on Description
+    # 2. TF-IDF on description
     # ------------------------------------------------------------------
-    df['Description'] = df['Description'].fillna('')
-    vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
-    X = vectorizer.fit_transform(df['Description']).toarray()
+    df['description'] = df['description'].fillna('')
+
+    # Sample for speed if very large
+    SAMPLE_SIZE = 20000
+    if len(df) > SAMPLE_SIZE:
+        df = df.sample(SAMPLE_SIZE, random_state=42).reset_index(drop=True)
+        print(f"  [INFO] Sampled {SAMPLE_SIZE:,} records for training.")
+
+    vectorizer = TfidfVectorizer(max_features=2000, stop_words='english', ngram_range=(1,2))
+    X = vectorizer.fit_transform(df['description']).toarray()
 
     os.makedirs('models', exist_ok=True)
     joblib.dump(vectorizer, 'models/tfidf_vectorizer.pkl')
-    print("  TF-IDF vectorizer fitted  |  max_features=1000")
+    print(f"  TF-IDF vectorizer fitted  |  max_features=2000, ngram=(1,2)")
 
     # ------------------------------------------------------------------
-    # 3. Models
+    # 3. Models — using LinearSVC (faster than kernel SVC on large data)
     # ------------------------------------------------------------------
     models = {
-        'Naive Bayes':        MultinomialNB(),
+        'Naive Bayes':         MultinomialNB(),
         'Logistic Regression': LogisticRegression(max_iter=1000, random_state=42),
-        'Decision Tree':      DecisionTreeClassifier(random_state=42),
-        'Random Forest':      RandomForestClassifier(n_estimators=100, random_state=42),
-        'SVM':                SVC(probability=True, random_state=42),
+        'Decision Tree':       DecisionTreeClassifier(random_state=42),
+        'Random Forest':       RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+        'SVM (Linear)':        CalibratedClassifierCV(LinearSVC(random_state=42, max_iter=2000)),
     }
 
+    # Predict severity only (the 50k dataset has no Priority column)
     targets = {
-        'Severity_encoded': 'Severity',
-        'Priority_encoded': 'Priority',
+        'severity_encoded': 'Severity',
     }
+    # Add bug_category if encoded
+    if 'bug_category_encoded' in df.columns:
+        targets['bug_category_encoded'] = 'Bug Category'
 
     results = {}
 
     for encoded_col, label in targets.items():
         if encoded_col not in df.columns:
-            print(f"  [SKIP] '{encoded_col}' column not found.")
+            print(f"\n  [SKIP] '{encoded_col}' column not found.")
             continue
 
         print(f"\n{'-'*60}")
@@ -86,9 +97,7 @@ def train_and_evaluate():
         )
 
         target_results = {}
-        best_f1        = -1
-        best_model     = None
-        best_name      = None
+        best_f1, best_model, best_name = -1, None, None
 
         for name, model in models.items():
             model.fit(X_train, y_train)
@@ -110,21 +119,19 @@ def train_and_evaluate():
             print(f"  {name:<22} {acc:>9.4f} {prec:>10.4f} {rec:>8.4f} {f1:>9.4f}{marker}")
 
             if f1 > best_f1:
-                best_f1    = f1
-                best_model = model
-                best_name  = name
+                best_f1, best_model, best_name = f1, model, name
 
         results[label] = target_results
-
-        # Save best model
-        model_path = f"models/best_{label.lower()}_model.pkl"
+        model_key = 'severity' if 'severity' in encoded_col else encoded_col.replace('_encoded','')
+        model_path = f"models/best_{model_key}_model.pkl"
         joblib.dump(best_model, model_path)
         print(f"\n  Best model for {label}: {best_name}  (F1={best_f1:.4f})")
         print(f"  Saved to: {model_path}")
 
-    # ------------------------------------------------------------------
-    # 4. Save full results JSON
-    # ------------------------------------------------------------------
+    # Also save as best_priority_model for predict script compatibility
+    if 'severity_encoded' in df.columns:
+        joblib.dump(best_model, 'models/best_priority_model.pkl')
+
     json_path = 'data/model_evaluation_results.json'
     with open(json_path, 'w') as f:
         json.dump(results, f, indent=4)

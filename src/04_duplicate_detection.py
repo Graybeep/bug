@@ -1,53 +1,55 @@
 # ==============================================================================
 # 04_duplicate_detection.py
 # Task 5: Bug Identification — Duplicate Bug Detection
-# Uses TF-IDF cosine similarity to find potential duplicate bugs.
+# Uses TF-IDF cosine similarity on descriptions to find potential duplicates.
 # Input:  data/bug_reports_processed.csv
 # Output: data/potential_duplicates.json  |  visualizations/duplicate_bugs.png
 # ==============================================================================
 
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import json
-import os
-import sys
+import json, os, sys
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 def detect_duplicates(file_path='data/bug_reports_processed.csv', threshold=0.85):
     print("=" * 60)
-    print("  TASK 5: Bug Identification — Duplicate Detection")
+    print("  TASK 5: Bug Identification -- Duplicate Detection")
     print("=" * 60)
 
-    # Load
     df = pd.read_csv(file_path)
-    df['Description'] = df['Description'].fillna('')
+    df['description'] = df['description'].fillna('')
     total = len(df)
-    print(f"\n  Loaded '{file_path}'  |  {total} records")
+    id_col = 'bug_id' if 'bug_id' in df.columns else df.columns[0]
+
+    print(f"\n  Loaded '{file_path}'  |  {total:,} records")
     print(f"  Similarity threshold : {threshold}")
+    print(f"\n  Computing TF-IDF similarity matrix (this may take a moment)...")
 
-    # TF-IDF vectorization
-    print("\n  Computing TF-IDF similarity matrix...")
-    vectorizer     = TfidfVectorizer(stop_words='english')
-    tfidf_matrix   = vectorizer.fit_transform(df['Description'])
-    sim_matrix     = cosine_similarity(tfidf_matrix)
+    # Use a sample for very large datasets to keep runtime reasonable
+    SAMPLE_SIZE = 5000
+    if total > SAMPLE_SIZE:
+        df_sample = df.sample(SAMPLE_SIZE, random_state=42).reset_index(drop=True)
+        print(f"  [INFO] Sampling {SAMPLE_SIZE:,} records for similarity computation.")
+    else:
+        df_sample = df.reset_index(drop=True)
 
-    # Find pairs above threshold
+    vectorizer   = TfidfVectorizer(stop_words='english', max_features=500)
+    tfidf_matrix = vectorizer.fit_transform(df_sample['description'])
+    sim_matrix   = cosine_similarity(tfidf_matrix)
+
     duplicates = []
-    id_col = 'Bug ID' if 'Bug ID' in df.columns else df.columns[0]
-
-    for i in range(total):
-        for j in range(i + 1, total):
+    n = len(df_sample)
+    for i in range(n):
+        for j in range(i + 1, n):
             if sim_matrix[i, j] > threshold:
                 duplicates.append({
-                    'Bug_1':      df.iloc[i][id_col],
-                    'Bug_2':      df.iloc[j][id_col],
+                    'Bug_1':      df_sample.iloc[i][id_col],
+                    'Bug_2':      df_sample.iloc[j][id_col],
                     'Similarity': round(float(sim_matrix[i, j]), 4)
                 })
 
@@ -59,35 +61,39 @@ def detect_duplicates(file_path='data/bug_reports_processed.csv', threshold=0.85
     with open(json_path, 'w') as f:
         json.dump(duplicates, f, indent=4)
 
-    # Summary table
+    # Summary
     print("\n" + "-" * 60)
     print("  DUPLICATE DETECTION SUMMARY")
     print("-" * 60)
-    print(f"  Total bug pairs checked      : {total*(total-1)//2}")
-    print(f"  Duplicate pairs found        : {num_dup}")
-    print(f"  Unique bugs involved         : {len(set([d['Bug_1'] for d in duplicates] + [d['Bug_2'] for d in duplicates]))}")
+    n_sample = len(df_sample)
+    print(f"  Sample size used             : {n_sample:,}")
+    print(f"  Total pairs checked          : {n_sample*(n_sample-1)//2:,}")
+    print(f"  Duplicate pairs found        : {num_dup:,}")
+    unique_involved = len(set(
+        [d['Bug_1'] for d in duplicates] + [d['Bug_2'] for d in duplicates]
+    ))
+    print(f"  Unique bugs involved         : {unique_involved:,}")
     print(f"  Results saved to             : {json_path}")
 
     if duplicates:
-        print(f"\n  Top 5 most similar pairs:")
         top5 = sorted(duplicates, key=lambda x: x['Similarity'], reverse=True)[:5]
+        print(f"\n  Top 5 most similar pairs:")
         for d in top5:
             print(f"    {d['Bug_1']} <-> {d['Bug_2']}  |  Similarity: {d['Similarity']:.4f}")
 
-    # Chart: Duplicate vs Non-Duplicate
+    # Chart: Duplicate vs Unique
     os.makedirs('visualizations', exist_ok=True)
     sns.set_theme(style='whitegrid', font_scale=1.1)
-
-    dup_bug_ids  = set([d['Bug_1'] for d in duplicates] + [d['Bug_2'] for d in duplicates])
-    dup_label    = df[id_col].apply(lambda x: 'Duplicate' if x in dup_bug_ids else 'Unique')
-    counts       = dup_label.value_counts()
+    dup_ids   = set([d['Bug_1'] for d in duplicates] + [d['Bug_2'] for d in duplicates])
+    labels    = df_sample[id_col].apply(lambda x: 'Duplicate' if x in dup_ids else 'Unique')
+    counts    = labels.value_counts()
 
     fig, ax = plt.subplots(figsize=(7, 5))
     colors = ['#E53935', '#43A047']
     bars = ax.bar(counts.index, counts.values, color=colors, edgecolor='white', linewidth=1.2, width=0.5)
     for bar in bars:
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 5,
-                f'{int(bar.get_height())}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 20,
+                f'{int(bar.get_height()):,}', ha='center', va='bottom', fontsize=12, fontweight='bold')
     ax.set_title('Duplicate vs Unique Bugs', fontsize=14, fontweight='bold', pad=15)
     ax.set_xlabel('Bug Type', fontsize=12)
     ax.set_ylabel('Count', fontsize=12)
@@ -101,7 +107,6 @@ def detect_duplicates(file_path='data/bug_reports_processed.csv', threshold=0.85
     print("\n" + "=" * 60)
     print("  DUPLICATE DETECTION COMPLETE")
     print("=" * 60)
-
     return duplicates
 
 if __name__ == "__main__":

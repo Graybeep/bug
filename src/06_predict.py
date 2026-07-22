@@ -1,9 +1,9 @@
 # ==============================================================================
 # 06_predict.py
-# Task 7: Bug Severity and Priority Prediction
-# Uses the best trained models to predict Severity and Priority for a new bug.
+# Task 7: Bug Severity Prediction
+# Uses the best trained model to predict Severity for a new bug description.
 # Input:  --desc "Your bug description here"
-# Output: Predicted Severity and Priority (console)
+# Output: Predicted Severity (console)
 # ==============================================================================
 
 import joblib
@@ -15,63 +15,44 @@ if sys.platform == "win32":
 
 def predict_bug(description: str):
     print("=" * 60)
-    print("  TASK 7: Bug Severity & Priority Prediction")
+    print("  TASK 7: Bug Severity Prediction")
     print("=" * 60)
 
     # Load models and encoders
     try:
         vectorizer     = joblib.load('models/tfidf_vectorizer.pkl')
         severity_model = joblib.load('models/best_severity_model.pkl')
-        priority_model = joblib.load('models/best_priority_model.pkl')
         encoders       = joblib.load('models/label_encoders.pkl')
     except FileNotFoundError as e:
         print(f"  [ERROR] {e}")
         print("  Please run 05_modeling.py first to train the models.")
         return None
 
-    # Vectorize input
-    X_input = vectorizer.transform([description]).toarray()
+    # Vectorize and predict
+    X_input  = vectorizer.transform([description]).toarray()
+    sev_enc  = severity_model.predict(X_input)[0]
+    severity = encoders['severity'].inverse_transform([sev_enc])[0]
 
-    # Predict encoded labels
-    sev_enc = severity_model.predict(X_input)[0]
-    pri_enc = priority_model.predict(X_input)[0]
-
-    # Decode back to original labels
-    severity = encoders['Severity'].inverse_transform([sev_enc])[0]
-    priority = encoders['Priority'].inverse_transform([pri_enc])[0]
-
-    # Severity colour hints for interpretation
     sev_note = {
-        'Critical': 'Immediate action required — system is unusable.',
-        'Major':    'Significant impact — needs urgent resolution.',
-        'Minor':    'Limited impact — schedule for next sprint.',
-        'Trivial':  'Cosmetic/low impact — address when possible.',
+        'Critical': 'Immediate action required -- system is unusable.',
+        'High':     'Significant impact -- needs urgent resolution.',
+        'Medium':   'Moderate impact -- schedule for next sprint.',
+        'Low':      'Minor impact -- address when possible.',
     }.get(severity, '')
-
-    pri_note = {
-        'P1': 'Highest priority — fix immediately.',
-        'P2': 'High priority — fix in current release.',
-        'P3': 'Medium priority — fix in next release.',
-        'P4': 'Low priority — fix when convenient.',
-        'P5': 'Lowest priority — optional fix.',
-    }.get(priority, '')
 
     print(f"\n  Input Description:")
     print(f"  {description}\n")
-    print(f"  {'─'*56}")
+    print(f"  {'-'*56}")
     print(f"  Predicted Severity : {severity}")
     print(f"  Note               : {sev_note}")
-    print(f"  {'─'*56}")
-    print(f"  Predicted Priority : {priority}")
-    print(f"  Note               : {pri_note}")
-    print(f"  {'─'*56}")
+    print(f"  {'-'*56}")
     print("=" * 60)
 
-    return {'Severity': severity, 'Priority': priority}
+    return {'Severity': severity}
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Predict Bug Severity and Priority")
+    parser = argparse.ArgumentParser(description="Predict Bug Severity")
     parser.add_argument(
         '--desc',
         type=str,
