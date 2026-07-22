@@ -1,4 +1,4 @@
-# 🐛 Bug Management System — Milestone 2
+# 🐛 Bug Management System
 
 An end-to-end machine learning pipeline for collecting, preprocessing, visualizing, and predicting software bug severity, simulating real-world data from platforms like **Bugzilla**, **JIRA**, and **GitHub**.
 
@@ -100,7 +100,7 @@ python src/06_predict.py --desc "App crashes on login with valid credentials"
 
 ---
 
-## 📋 Milestone 2 — Task Coverage
+## 📋 Task Coverage
 
 | # | Task | Script | Output |
 |---|------|--------|--------|
@@ -114,20 +114,21 @@ python src/06_predict.py --desc "App crashes on login with valid credentials"
 
 ---
 
-## 📊 Dataset Fields
+## 📊 Dataset Fields (50k Kaggle Dataset)
 
 | Field | Description |
 |-------|-------------|
-| `Bug ID` | Unique identifier (BUG-0001 ... BUG-1500) |
-| `Summary` | Short title of the bug |
-| `Description` | Detailed description text |
-| `Status` | New / Assigned / In Progress / Resolved / Closed |
-| `Severity` | Trivial / Minor / Major / Critical |
-| `Priority` | P1 (highest) to P5 (lowest) |
-| `Resolution` | Fixed / Duplicate / Won't Fix / Cannot Reproduce / Not a Bug |
-| `Assigned_To` | Developer assigned to the bug |
-| `Module` | System module where bug was found |
-| `Reported_Date` | Date the bug was reported (2024) |
+| `bug_id` | Unique identifier (BUG_000001 ... BUG_050000) |
+| `title` | Short title of the bug |
+| `description` | Detailed description text (used for ML) |
+| `error_code` | HTTP-style error code (400, 404, 500, 503) |
+| `bug_category` | Type of bug (Memory Leak, API Bug, Auth Bug, etc.) |
+| `bug_domain` | System domain (Backend, Mobile, DevOps, etc.) |
+| `tech_stack` | Technology involved (Angular, Flask, Django, etc.) |
+| `severity` | Low / Medium / High / Critical |
+| `environment` | Development / Staging / Production |
+| `developer_role` | Role responsible (Backend, Frontend, DevOps, etc.) |
+| `created_at` | Date the bug was reported |
 
 ---
 
@@ -135,12 +136,12 @@ python src/06_predict.py --desc "App crashes on login with valid credentials"
 
 | Chart | Description |
 |-------|-------------|
-| Bug Status Distribution | Count of bugs in each lifecycle stage |
-| Bug Priority Distribution | Count of bugs per priority level (P1–P5) |
-| Bug Severity Distribution | Pie chart of Trivial/Minor/Major/Critical bugs |
-| Bugs Assigned to Developers | Horizontal bar — workload per developer |
-| Bug Reporting Trend Over Time | Monthly line chart of bug reports in 2024 |
-| Bugs by Module | Bar chart of bugs per system module |
+| Bug Severity Distribution | Pie chart of Low/Medium/High/Critical bugs |
+| Bug Category Distribution | Count of bugs per category (Memory Leak, API Bug, etc.) |
+| Bug Domain Distribution | Count of bugs per system domain |
+| Bugs by Developer Role | Horizontal bar — workload per developer role |
+| Bug Reporting Trend Over Time | Monthly line chart of bug reports |
+| Bugs by Tech Stack | Bar chart of bugs per technology |
 
 All charts are saved to the `visualizations/` folder and open automatically when the script runs.
 
@@ -162,15 +163,16 @@ All 5 models are trained on **TF-IDF features** extracted from bug descriptions 
 
 ---
 
-## 🔍 Key Observations (from actual run)
+## 🔍 Key Observations (from actual run on 50k dataset)
 
-1. **56%** of all bugs are in Resolved/Closed state
-2. **P3** is the most common priority — 318 bugs
-3. **379 Critical** bugs (25%) require urgent resolution
-4. **Henry Wilson** has the highest bug load (201 bugs) — workload rebalancing recommended
-5. **December 2024** saw the peak bug reporting (142 bugs)
-6. **Notifications** module has the highest defect count (210 bugs)
-7. **112,707** potential duplicate pairs detected via cosine similarity (threshold > 0.85)
+1. **Low** severity is the most common — 12,628 bugs (25%)
+2. **12,432 Critical/High** bugs (24%) require urgent resolution
+3. **Memory Leak** is the most frequent bug category (3,220 bugs)
+4. **Backend Systems** domain has the most bugs (8,477)
+5. **Mobile Developer** role handles the highest bug load (5,701 bugs)
+6. **January 2026** saw peak bug reporting (4,304 bugs)
+7. **Angular** has the highest bug count by tech stack (3,300 bugs)
+8. **780,515** potential duplicate pairs detected via cosine similarity (threshold > 0.85, 5k sample)
 
 ---
 
