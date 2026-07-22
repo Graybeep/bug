@@ -74,6 +74,11 @@ def detect_duplicates(file_path='data/bug_reports_processed.csv', threshold=0.85
     ))
     print(f"  Unique bugs involved         : {unique_involved:,}")
     print(f"  Results saved to             : {json_path}")
+    print(f"\n  [NOTE] This dataset's 'description' field is a fixed boilerplate template")
+    print(f"         per bug_category (16 templates total for 50k rows), not free-form text.")
+    print(f"         So every pair flagged here is really just 'same bug_category' -- these")
+    print(f"         are not genuine duplicate bug reports, and this count should not be read")
+    print(f"         as real duplication in the underlying bugs.")
 
     if duplicates:
         top5 = sorted(duplicates, key=lambda x: x['Similarity'], reverse=True)[:5]

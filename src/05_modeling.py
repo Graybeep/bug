@@ -79,7 +79,6 @@ def train_and_evaluate():
         targets['bug_category_encoded'] = 'Bug Category'
 
     results = {}
-    saved_severity_model = None  # Track separately to avoid overwrite by later targets
 
     for encoded_col, label in targets.items():
         if encoded_col not in df.columns:
@@ -129,14 +128,16 @@ def train_and_evaluate():
         print(f"\n  Best model for {label}: {best_name}  (F1={best_f1:.4f})")
         print(f"  Saved to: {model_path}")
 
-        # Capture severity model separately before it gets overwritten
         if encoded_col == 'severity_encoded':
-            saved_severity_model = best_model
-
-    # Save severity model under alternative name for predict script compatibility
-    if saved_severity_model is not None:
-        joblib.dump(saved_severity_model, 'models/best_priority_model.pkl')
-        print("  Also saved as: models/best_priority_model.pkl (predict script alias)")
+            print(f"\n  [NOTE] Severity accuracy above is expected to sit near chance level")
+            print(f"         (~25% for 4 classes). Severity in this dataset is statistically")
+            print(f"         independent of bug_category/environment/error_code/developer_role")
+            print(f"         and of the description text, so no model can learn real signal for it.")
+        if encoded_col == 'bug_category_encoded':
+            print(f"\n  [NOTE] Bug Category accuracy above is expected to be ~100%. This is")
+            print(f"         leakage, not generalization: 'description' is a fixed boilerplate")
+            print(f"         template unique per category (16 templates for 50k rows), so the")
+            print(f"         model is matching template text back to its own label.")
 
     json_path = 'data/model_evaluation_results.json'
     with open(json_path, 'w') as f:

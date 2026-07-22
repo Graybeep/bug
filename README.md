@@ -1,6 +1,6 @@
 # 🐛 Bug Management System
 
-An end-to-end machine learning pipeline for collecting, preprocessing, visualizing, and predicting software bug severity, simulating real-world data from platforms like **Bugzilla**, **JIRA**, and **GitHub**.
+An end-to-end machine learning pipeline for collecting, preprocessing, visualizing, and predicting software bug severity, built on a real 50k bug report dataset sourced from Kaggle.
 
 ---
 
@@ -32,7 +32,7 @@ The dataset is **not included** in this repository (too large for GitHub). You m
 ```
 BugManagement/
 ├── data/
-│   ├── bug_reports.csv                # Raw generated dataset
+│   ├── bug_dataset_50k.csv            # Source dataset (download from Kaggle, see above)
 │   ├── bug_reports_processed.csv      # Cleaned & encoded dataset
 │   ├── potential_duplicates.json      # Detected duplicate bug pairs
 │   └── model_evaluation_results.json  # ML model metrics
@@ -40,7 +40,7 @@ BugManagement/
 │   ├── label_encoders.pkl             # Fitted label encoders
 │   ├── tfidf_vectorizer.pkl           # TF-IDF vectorizer
 │   ├── best_severity_model.pkl        # Best model for Severity prediction
-│   └── best_priority_model.pkl        # Best model for Priority prediction
+│   └── best_bug_category_model.pkl    # Best model for Bug Category prediction
 ├── src/
 │   ├── 01_data_collection.py          # Task 1 & 2: Generate dataset
 │   ├── 02_preprocessing.py            # Task 3: Clean & encode data
@@ -91,10 +91,10 @@ python src/03_visualization.py
 # Step 5: Detect duplicate bugs via TF-IDF cosine similarity
 python src/04_duplicate_detection.py
 
-# Step 6: Train 5 ML models for Severity & Priority prediction
+# Step 6: Train 5 ML models for Severity & Bug Category prediction
 python src/05_modeling.py
 
-# Step 7: Predict severity & priority for a new bug description
+# Step 7: Predict severity for a new bug description
 python src/06_predict.py --desc "App crashes on login with valid credentials"
 ```
 
@@ -110,7 +110,7 @@ python src/06_predict.py --desc "App crashes on login with valid credentials"
 | 4 | Data Visualization | `03_visualization.py` | 6 PNG charts + Observations |
 | 5 | Bug Identification | `04_duplicate_detection.py` | `data/potential_duplicates.json` |
 | 6 | Model Training & Testing | `05_modeling.py` | 5 models evaluated, best saved |
-| 7 | Severity & Priority Prediction | `06_predict.py` | Console prediction output |
+| 7 | Severity Prediction | `06_predict.py` | Console prediction output |
 
 ---
 
@@ -172,7 +172,22 @@ All 5 models are trained on **TF-IDF features** extracted from bug descriptions 
 5. **Mobile Developer** role handles the highest bug load (5,701 bugs)
 6. **January 2026** saw peak bug reporting (4,304 bugs)
 7. **Angular** has the highest bug count by tech stack (3,300 bugs)
-8. **780,515** potential duplicate pairs detected via cosine similarity (threshold > 0.85, 5k sample)
+8. **780,515** potential duplicate pairs detected via cosine similarity (threshold > 0.85, 5k sample) — see the data limitation on duplicate detection below before reading this as genuine duplication.
+
+---
+
+## ⚠️ Known Data Limitations
+
+These are properties of the source dataset itself, not bugs in this repo's code — documented here so results aren't misread.
+
+1. **`title`, `description`, `root_cause`, and `suggested_fix` are boilerplate templates, not free text.**
+   Each has only **16 unique values across all 50,000 rows** — one fixed template per `bug_category` (e.g. every "Memory Leak" row shares the exact same description string, verbatim). There is no per-bug information in these fields beyond the category name.
+
+2. **Consequence for `05_modeling.py` — Bug Category prediction:** all 5 models score **100.0% accuracy**. This is not generalization, it's leakage: the model is matching a template string back to the label it was copied from.
+
+3. **Consequence for `05_modeling.py` — Severity prediction:** all 5 models score **~25.5% accuracy** — chance level for 4 classes. We verified `severity` is statistically independent of `bug_category`, `bug_domain`, `environment`, `error_code`, and `developer_role` (near-uniform ~25% split within every group), and of the description text. Severity appears to be assigned independently at random in the source data, so **no model — text-based or feature-based — can predict it above chance from this dataset.**
+
+4. **Consequence for `04_duplicate_detection.py`:** because every bug in a category shares identical description text, TF-IDF cosine similarity flags same-category bugs as "duplicates" (similarity = 1.0), regardless of whether they're actually the same reported issue. The reported pair counts reflect **category membership, not genuine duplicate bug reports.**
 
 ---
 
