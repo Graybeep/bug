@@ -1,0 +1,39 @@
+{
+    "stage_counts": {
+        "Reported": 9981,
+        "In Progress": 9421,
+        "Resolved": 11424,
+        "Verification": 5026,
+        "Closed": 14148
+    },
+    "status_counts": {
+        "Closed": 10142,
+        "In Progress": 6974,
+        "Fixed": 6844,
+        "Assigned": 5040,
+        "Verified": 5026,
+        "New": 4941,
+        "Pending Retest": 4580,
+        "Reopened": 2447,
+        "Duplicate": 2002,
+        "Rejected": 1481,
+        "Deferred": 523
+    },
+    "open_backlog": 19402,
+    "urgent_open": 6763,
+    "reopened": 2447,
+    "resolution_counts": {
+        "Fixed": 26592,
+        "Unresolved": 19402,
+        "Duplicate": 2002,
+        "Invalid": 1481,
+        "Won't Fix": 523
+    },
+    "critical_by_stage": {
+        "Reported": 2514,
+        "In Progress": 2335,
+        "Resolved": 2754,
+        "Verification": 1231,
+        "Closed": 3598
+    }
+}

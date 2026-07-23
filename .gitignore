@@ -11,6 +11,7 @@ __pycache__/
 data/bug_dataset_50k.csv
 data/potential_duplicates.json
 data/bug_reports_processed.csv
+data/bug_reports_enriched.csv
 
 # Trained model binaries
 models/

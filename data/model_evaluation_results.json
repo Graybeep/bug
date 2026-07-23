@@ -31,6 +31,38 @@
             "F1-Score": 0.2147
         }
     },
+    "Priority": {
+        "Naive Bayes": {
+            "Accuracy": 0.3805,
+            "Precision": 0.45,
+            "Recall": 0.3805,
+            "F1-Score": 0.3622
+        },
+        "Logistic Regression": {
+            "Accuracy": 0.4595,
+            "Precision": 0.4582,
+            "Recall": 0.4595,
+            "F1-Score": 0.4568
+        },
+        "Decision Tree": {
+            "Accuracy": 0.7782,
+            "Precision": 0.7789,
+            "Recall": 0.7782,
+            "F1-Score": 0.7785
+        },
+        "Random Forest": {
+            "Accuracy": 0.8077,
+            "Precision": 0.8084,
+            "Recall": 0.8077,
+            "F1-Score": 0.8079
+        },
+        "SVM (Linear)": {
+            "Accuracy": 0.4587,
+            "Precision": 0.4537,
+            "Recall": 0.4587,
+            "F1-Score": 0.4535
+        }
+    },
     "Bug Category": {
         "Naive Bayes": {
             "Accuracy": 1.0,
