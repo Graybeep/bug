@@ -101,10 +101,13 @@ def evaluate_target(X, y, label, model_key, index, total, class_names=None, note
 
     target_results = {}
     best_f1, best_model, best_name, best_pred = -1, None, None, None
+    rf_model = None
 
     for name, model in build_models().items():
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+        if name == 'Random Forest':
+            rf_model = model
 
         acc  = accuracy_score(y_test, y_pred)
         prec = precision_score(y_test, y_pred, average='weighted', zero_division=0)
@@ -131,6 +134,13 @@ def evaluate_target(X, y, label, model_key, index, total, class_names=None, note
     model_path = f"models/best_{model_key}_model.pkl"
     joblib.dump(best_model, model_path)
     print(f"  * best by F1 -> {model_path}")
+
+    # Always persist Random Forest too — 07_bug_triage.py uses it by name.
+    if rf_model is not None:
+        rf_path = f"models/rf_{model_key}_model.pkl"
+        joblib.dump(rf_model, rf_path)
+        if best_name != 'Random Forest':
+            print(f"    Random Forest also saved -> {rf_path}")
 
     if class_names is not None:
         print()

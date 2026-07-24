@@ -16,3 +16,5 @@ data/bug_reports_enriched.csv
 # Trained model binaries
 models/
 
+
+data/tracked_bugs.json

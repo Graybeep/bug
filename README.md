@@ -37,6 +37,8 @@ BugManagement/
 │   ├── bug_reports_processed.csv      # Cleaned & encoded dataset
 │   ├── potential_duplicates.json      # Detected duplicate bug pairs
 │   ├── lifecycle_analysis.json        # Life cycle stage / status / resolution breakdown
+│   ├── bug_knowledge_base.json        # Per-category root cause / fix / owning role
+│   ├── tracked_bugs.json              # Live ticket tracker (created by 07)
 │   └── model_evaluation_results.json  # ML model metrics
 ├── models/
 │   ├── label_encoders.pkl             # Fitted label encoders
@@ -44,7 +46,8 @@ BugManagement/
 │   ├── priority_features.pkl          # Structured-feature column list + scaler
 │   ├── best_severity_model.pkl        # Best model for Severity prediction
 │   ├── best_priority_model.pkl        # Best model for Priority prediction
-│   └── best_bug_category_model.pkl    # Best model for Bug Category prediction
+│   ├── best_bug_category_model.pkl    # Best model for Bug Category prediction
+│   └── rf_*_model.pkl                 # Random Forest per target (used by 07)
 ├── src/
 │   ├── 01_data_collection.py          # Task 1 & 2: Load dataset + derive lifecycle fields
 │   ├── 02_preprocessing.py            # Task 3: Clean & encode data
@@ -52,6 +55,7 @@ BugManagement/
 │   ├── 04_duplicate_detection.py      # Task 5: Duplicates + life cycle categorization
 │   ├── 05_modeling.py                 # Task 6: Train & evaluate 5 ML models per target
 │   ├── 06_predict.py                  # Task 7: Predict severity & priority
+│   ├── 07_bug_triage.py               # Task 8: Full triage — assign, diagnose, track
 │   ├── _deps.py                       # Dependency guard (clear message if venv not active)
 │   └── present_dataset.py             # Optional: rich console summary of the dataset
 ├── visualizations/
@@ -133,6 +137,11 @@ python src/05_modeling.py
 # Step 7: Predict severity and priority for a new bug
 python src/06_predict.py --desc "App crashes on login with valid credentials" \
                          --environment Production --error-code 500
+
+# Step 8: Full triage — predict, assign a developer, diagnose, and track
+python src/07_bug_triage.py --title "Checkout page crashes" \
+       --desc "Payment page freezes after submit" \
+       --error-code 500 --category "Backend Logic Bug" --environment Production
 ```
 
 > **Working directory doesn't matter.** Every script resolves its paths from the project root, so you can launch them from the project root, from inside `src/`, from an IDE's Run button, or from anywhere else — they'll always find `data/` and `models/`.
@@ -147,6 +156,7 @@ python src/06_predict.py --desc "App crashes on login with valid credentials" \
 | `04` | Duplicate pair count, **example pairs with each bug's title/category/severity/status/priority**, **duplicate group table** (size + dominant category + purity), life cycle stage table, open backlog / urgent / reopen figures, resolution mix |
 | `05` | Per-target metrics table (5 models × Accuracy/Precision/Recall/F1), best model per target, per-class classification report |
 | `06` | Input description + context, predicted **Severity** and **Priority** with triage notes |
+| `07` | 5-step triage report: reported details → cleaning → Random Forest prediction → developer assignment + root cause + suggested fix → life cycle tracking |
 
 ---
 
@@ -161,6 +171,7 @@ python src/06_predict.py --desc "App crashes on login with valid credentials" \
 | 5 | Bug Identification | `04_duplicate_detection.py` | `potential_duplicates.json`, `lifecycle_analysis.json` |
 | 6 | Model Training & Testing | `05_modeling.py` | 5 models × 3 targets, best saved |
 | 7 | Severity & Priority Prediction | `06_predict.py` | Console prediction output |
+| 8 | End-to-End Triage & Tracking | `07_bug_triage.py` | `data/tracked_bugs.json`, lifecycle chart |
 
 ---
 
@@ -215,6 +226,77 @@ About 8% of rows are nudged one level up or down (seeded) to reflect the fact th
 
 ---
 
+## 🎫 End-to-End Bug Triage (`07_bug_triage.py`)
+
+The complete workflow: a user reports a bug, the system cleans and analyses it, **Random Forest** predicts severity and priority, the bug is assigned to the right developer with a root cause and suggested fix, and its progress is tracked and visualized until resolved.
+
+```bash
+# Demo: triage 5 representative bugs at once (default with no arguments)
+python src/07_bug_triage.py
+python src/07_bug_triage.py --reset       # clear old tickets first
+
+# Report a single bug
+python src/07_bug_triage.py --title "Login API times out" \
+       --desc "Authentication endpoint times out during peak traffic" \
+       --error-code 503 --category "Authentication Bug" \
+       --environment Production --severity High
+
+# Track it
+python src/07_bug_triage.py --list                # all tickets + chart
+python src/07_bug_triage.py --advance TKT_0001    # move one stage forward
+python src/07_bug_triage.py --resolve TKT_0001    # drive through to Closed
+python src/07_bug_triage.py --categories          # show the knowledge base
+```
+
+Running with no arguments triages five bugs chosen to exercise different categories, environments and severities, so the routing is visible side by side:
+
+```
+  Ticket    Pri  Severity  Assigned to           Title
+  TKT_0001  P1   Critical  Backend Developer     Checkout page crashes on payment
+  TKT_0002  P2   High      Security Engineer     Login API times out under load
+  TKT_0003  P3   Medium    Data Engineer         Customer records load slowly
+  TKT_0004  P1   High      Mobile Developer      Android app crashes on startup
+  TKT_0005  P5   Low       Frontend Developer    Save button label overflows
+```
+
+Same system, five different owners and priorities — the **category** decides the owner, and **severity + environment + error code** together decide the priority.
+
+Output:
+
+```
+  [3] RANDOM FOREST PREDICTION
+      Severity    : Critical   System unusable — immediate action required.
+      Priority    : P2         Fix in the current sprint.
+
+  [4] ASSIGNMENT & DIAGNOSIS
+      Assigned to : Security Engineer
+      Escalation  : P2 — flagged to the team lead for immediate triage.
+      Root cause  : Misconfiguration or logic issue related to authentication bug
+      Suggested   : Review and fix the authentication bug according to best practices
+
+  [5] LIFE CYCLE TRACKING
+      Ticket ID   : TKT_0002
+      Progress    : [x] New  ->  [>] Assigned  ->  [ ] In Progress  ->  [ ] Fixed
+                    [ ] Pending Retest  ->  [ ] Verified  ->  [ ] Closed
+```
+
+### Developer routing
+
+`developer_role` in the source dataset is **uniformly random** — all 9 roles appear at ~11.1% inside every single category, so no model can learn assignment from it. Instead the system uses a **documented routing table** (category → specialist), with a domain override for mobile and automatic escalation for P1/P2:
+
+| Category | Owner | | Category | Owner |
+|---|---|---|---|---|
+| API Bug, Backend Logic, Concurrency, Memory Leak, Performance | Backend Developer | | Database Bug | Data Engineer |
+| Authentication, Authorization, Security Vulnerability | Security Engineer | | Cloud Configuration | Cloud Engineer |
+| CI/CD, Deployment, Logging, Monitoring | DevOps Engineer | | UI Bug, Frontend Routing | Frontend Developer |
+| *any category, `--domain Mobile`* | Mobile Developer | | | |
+
+### Root cause & suggested fix
+
+Looked up from `data/bug_knowledge_base.json`, built by `01_data_collection.py`. Each of the 16 categories has exactly **one** distinct `root_cause` and `suggested_fix` in the dataset, so these are a reliable lookup rather than something to predict.
+
+---
+
 ## 📈 Data Visualization — Charts Generated
 
 | Chart | Description | Script |
@@ -229,6 +311,7 @@ About 8% of rows are nudged one level up or down (seeded) to reflect the fact th
 | Bug Reporting Trend Over Time | Monthly line chart of bug reports | `03` |
 | Bugs by Tech Stack | Bar chart of bugs per technology | `03` |
 | Duplicate vs Unique Bugs | Duplicate detection result | `04` |
+| Tracked Bug Life Cycle | Ticket status counts + per-ticket progress bars | `07` |
 
 All charts are saved to the `visualizations/` folder **and opened in your default image viewer** when the script runs. Pass `--no-open` to only save them.
 

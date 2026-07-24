@@ -1,0 +1,114 @@
+{
+    "API Bug": {
+        "root_cause": "Misconfiguration or logic issue related to api bug",
+        "suggested_fix": "Review and fix the api bug according to best practices",
+        "assigned_role": "Backend Developer",
+        "sample_title": "API Bug detected in system",
+        "bug_count": 3141
+    },
+    "Authentication Bug": {
+        "root_cause": "Misconfiguration or logic issue related to authentication bug",
+        "suggested_fix": "Review and fix the authentication bug according to best practices",
+        "assigned_role": "Security Engineer",
+        "sample_title": "Authentication Bug detected in system",
+        "bug_count": 3083
+    },
+    "Authorization Bug": {
+        "root_cause": "Misconfiguration or logic issue related to authorization bug",
+        "suggested_fix": "Review and fix the authorization bug according to best practices",
+        "assigned_role": "Security Engineer",
+        "sample_title": "Authorization Bug detected in system",
+        "bug_count": 3152
+    },
+    "Backend Logic Bug": {
+        "root_cause": "Misconfiguration or logic issue related to backend logic bug",
+        "suggested_fix": "Review and fix the backend logic bug according to best practices",
+        "assigned_role": "Backend Developer",
+        "sample_title": "Backend Logic Bug detected in system",
+        "bug_count": 3095
+    },
+    "CI/CD Bug": {
+        "root_cause": "Misconfiguration or logic issue related to ci/cd bug",
+        "suggested_fix": "Review and fix the ci/cd bug according to best practices",
+        "assigned_role": "DevOps Engineer",
+        "sample_title": "CI/CD Bug detected in system",
+        "bug_count": 3075
+    },
+    "Cloud Configuration Bug": {
+        "root_cause": "Misconfiguration or logic issue related to cloud configuration bug",
+        "suggested_fix": "Review and fix the cloud configuration bug according to best practices",
+        "assigned_role": "Cloud Engineer",
+        "sample_title": "Cloud Configuration Bug detected in system",
+        "bug_count": 3181
+    },
+    "Concurrency Bug": {
+        "root_cause": "Misconfiguration or logic issue related to concurrency bug",
+        "suggested_fix": "Review and fix the concurrency bug according to best practices",
+        "assigned_role": "Backend Developer",
+        "sample_title": "Concurrency Bug detected in system",
+        "bug_count": 3130
+    },
+    "Database Bug": {
+        "root_cause": "Misconfiguration or logic issue related to database bug",
+        "suggested_fix": "Review and fix the database bug according to best practices",
+        "assigned_role": "Data Engineer",
+        "sample_title": "Database Bug detected in system",
+        "bug_count": 3082
+    },
+    "Deployment Bug": {
+        "root_cause": "Misconfiguration or logic issue related to deployment bug",
+        "suggested_fix": "Review and fix the deployment bug according to best practices",
+        "assigned_role": "DevOps Engineer",
+        "sample_title": "Deployment Bug detected in system",
+        "bug_count": 3153
+    },
+    "Frontend Routing Bug": {
+        "root_cause": "Misconfiguration or logic issue related to frontend routing bug",
+        "suggested_fix": "Review and fix the frontend routing bug according to best practices",
+        "assigned_role": "Frontend Developer",
+        "sample_title": "Frontend Routing Bug detected in system",
+        "bug_count": 2985
+    },
+    "Logging Bug": {
+        "root_cause": "Misconfiguration or logic issue related to logging bug",
+        "suggested_fix": "Review and fix the logging bug according to best practices",
+        "assigned_role": "DevOps Engineer",
+        "sample_title": "Logging Bug detected in system",
+        "bug_count": 3194
+    },
+    "Memory Leak": {
+        "root_cause": "Misconfiguration or logic issue related to memory leak",
+        "suggested_fix": "Review and fix the memory leak according to best practices",
+        "assigned_role": "Backend Developer",
+        "sample_title": "Memory Leak detected in system",
+        "bug_count": 3220
+    },
+    "Monitoring Bug": {
+        "root_cause": "Misconfiguration or logic issue related to monitoring bug",
+        "suggested_fix": "Review and fix the monitoring bug according to best practices",
+        "assigned_role": "DevOps Engineer",
+        "sample_title": "Monitoring Bug detected in system",
+        "bug_count": 3121
+    },
+    "Performance Bug": {
+        "root_cause": "Misconfiguration or logic issue related to performance bug",
+        "suggested_fix": "Review and fix the performance bug according to best practices",
+        "assigned_role": "Backend Developer",
+        "sample_title": "Performance Bug detected in system",
+        "bug_count": 3100
+    },
+    "Security Vulnerability": {
+        "root_cause": "Misconfiguration or logic issue related to security vulnerability",
+        "suggested_fix": "Review and fix the security vulnerability according to best practices",
+        "assigned_role": "Security Engineer",
+        "sample_title": "Security Vulnerability detected in system",
+        "bug_count": 3121
+    },
+    "UI Bug": {
+        "root_cause": "Misconfiguration or logic issue related to ui bug",
+        "suggested_fix": "Review and fix the ui bug according to best practices",
+        "assigned_role": "Frontend Developer",
+        "sample_title": "UI Bug detected in system",
+        "bug_count": 3167
+    }
+}

@@ -28,6 +28,7 @@ STAGES = [
     ('5',     'Bug Identification',                   'src/04_duplicate_detection.py'),
     ('6',     'Training and Testing Models',          'src/05_modeling.py'),
     ('7',     'Severity & Priority Prediction',       'src/06_predict.py'),
+    ('8',     'End-to-End Bug Triage & Tracking',     'src/07_bug_triage.py'),
 ]
 
 
@@ -67,7 +68,7 @@ def main():
     print("  BUG MANAGEMENT SYSTEM — FULL PIPELINE")
     print("=" * 70)
     print(f"  Python : {sys.version.split()[0]}")
-    print(f"  Stages : {len(STAGES)} scripts, Tasks 1 through 7")
+    print(f"  Stages : {len(STAGES)} scripts, Tasks 1 through 8")
 
     overall = time.time()
     completed = []

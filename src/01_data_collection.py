@@ -8,6 +8,7 @@
 # Output: data/bug_reports_enriched.csv  +  dataset summary on console
 # ==============================================================================
 
+import json
 import os
 import sys
 
@@ -27,6 +28,7 @@ os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DATASET_PATH = 'data/bug_dataset_50k.csv'
 ENRICHED_PATH = 'data/bug_reports_enriched.csv'
+KB_PATH = 'data/bug_knowledge_base.json'
 SEED = 42
 
 # ── Bug life cycle definition ─────────────────────────────────────────────────
@@ -82,6 +84,52 @@ ENVIRONMENT_SCORE = {'Production': 2, 'Staging': 1, 'Development': 0}
 BLOCKING_ERRORS   = {500.0, 502.0, 503.0}   # server-side failures block users
 
 PRIORITY_LEVELS = ['P1', 'P2', 'P3', 'P4', 'P5']
+
+# ── Developer routing ─────────────────────────────────────────────────────────
+# Which specialist should own each bug category. This is a documented routing
+# policy, NOT learned from the data: `developer_role` in the source dataset is
+# uniformly random (~11.1% for each of the 9 roles inside every single
+# category), so there is no assignment pattern for a model to learn.
+CATEGORY_TO_ROLE = {
+    'API Bug':                 'Backend Developer',
+    'Authentication Bug':      'Security Engineer',
+    'Authorization Bug':       'Security Engineer',
+    'Backend Logic Bug':       'Backend Developer',
+    'CI/CD Bug':               'DevOps Engineer',
+    'Cloud Configuration Bug': 'Cloud Engineer',
+    'Concurrency Bug':         'Backend Developer',
+    'Database Bug':            'Data Engineer',
+    'Deployment Bug':          'DevOps Engineer',
+    'Frontend Routing Bug':    'Frontend Developer',
+    'Logging Bug':             'DevOps Engineer',
+    'Memory Leak':             'Backend Developer',
+    'Monitoring Bug':          'DevOps Engineer',
+    'Performance Bug':         'Backend Developer',
+    'Security Vulnerability':  'Security Engineer',
+    'UI Bug':                  'Frontend Developer',
+}
+
+# A mobile-domain bug goes to the mobile specialist regardless of category.
+DOMAIN_OVERRIDE = {'Mobile': 'Mobile Developer'}
+
+
+def build_knowledge_base(df):
+    """Root cause + suggested fix + owning role for each bug category.
+
+    root_cause and suggested_fix have exactly one distinct value per category
+    in this dataset, so they can be looked up rather than predicted.
+    """
+    kb = {}
+    for category, group in df.groupby('bug_category'):
+        first = group.iloc[0]
+        kb[category] = {
+            'root_cause':    first.get('root_cause', ''),
+            'suggested_fix': first.get('suggested_fix', ''),
+            'assigned_role': CATEGORY_TO_ROLE.get(category, 'Full-Stack Developer'),
+            'sample_title':  first.get('title', ''),
+            'bug_count':     int(len(group)),
+        }
+    return kb
 
 
 def derive_priority(df, rng):
@@ -188,6 +236,21 @@ def load_dataset():
 
     os.makedirs('data', exist_ok=True)
     df.to_csv(ENRICHED_PATH, index=False)
+
+    # ------------------------------------------------------------------
+    # Knowledge base: root cause / suggested fix / owning role per category
+    # ------------------------------------------------------------------
+    kb = build_knowledge_base(df)
+    with open(KB_PATH, 'w') as f:
+        json.dump(kb, f, indent=4)
+
+    print("\n" + "-" * 60)
+    print("  KNOWLEDGE BASE (root cause / fix / owner per category)")
+    print("-" * 60)
+    print(f"  {'Category':<26}{'Assigned role':<22}{'Bugs':>7}")
+    for cat, entry in list(kb.items())[:5]:
+        print(f"  {cat:<26}{entry['assigned_role']:<22}{entry['bug_count']:>7,}")
+    print(f"  ... {len(kb)} categories total  ->  {KB_PATH}")
 
     print(f"\n  Sample (first 5 rows):")
     preview_cols = ['bug_id', 'title', 'severity', 'priority', 'status',
