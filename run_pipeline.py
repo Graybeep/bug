@@ -1,10 +1,10 @@
 # ==============================================================================
 # run_pipeline.py
-# Runs the complete Bug Management pipeline (Tasks 1-7) in order, streaming each
+# Runs the complete Bug Management pipeline (Tasks 1-9) in order, streaming each
 # stage's output to the console.
 #
-#   python run_pipeline.py                 # full pipeline, charts open at step 4
-#   python run_pipeline.py --no-open       # full pipeline, charts saved only
+#   python run_pipeline.py                 # full pipeline, charts + dashboard open
+#   python run_pipeline.py --no-open       # full pipeline, artifacts saved only
 #   python run_pipeline.py --skip-duplicates   # skip the slow similarity stage
 # ==============================================================================
 
@@ -29,6 +29,7 @@ STAGES = [
     ('6',     'Training and Testing Models',          'src/05_modeling.py'),
     ('7',     'Severity & Priority Prediction',       'src/06_predict.py'),
     ('8',     'End-to-End Bug Triage & Tracking',     'src/07_bug_triage.py'),
+    ('9',     'Interactive Dashboards & KPI Reports', 'src/08_dashboard.py'),
 ]
 
 
@@ -54,7 +55,7 @@ def run_stage(task, name, script, extra_args=None):
 def main():
     parser = argparse.ArgumentParser(description="Run the full Bug Management pipeline")
     parser.add_argument('--no-open', action='store_true',
-                        help="Do not open the charts in the image viewer at step 4")
+                        help="Do not open the charts (step 4) or the dashboard (step 9)")
     parser.add_argument('--skip-duplicates', action='store_true',
                         help="Skip step 5's similarity matrix (the slowest stage)")
     args = parser.parse_args()
@@ -68,7 +69,7 @@ def main():
     print("  BUG MANAGEMENT SYSTEM — FULL PIPELINE")
     print("=" * 70)
     print(f"  Python : {sys.version.split()[0]}")
-    print(f"  Stages : {len(STAGES)} scripts, Tasks 1 through 8")
+    print(f"  Stages : {len(STAGES)} scripts, Tasks 1 through 9")
 
     overall = time.time()
     completed = []
@@ -79,7 +80,14 @@ def main():
             continue
 
         extra = []
-        if script.endswith('03_visualization.py') and args.no_open:
+        if args.no_open and script.endswith(('03_visualization.py', '08_dashboard.py')):
+            extra = ['--no-open']
+
+        # Stage 7's chart window is modal — it blocks until closed by hand, which
+        # would stall the pipeline before the dashboard stage ever runs. Its PNG
+        # is still written to visualizations/. Stages 3 and 8 open their output
+        # without blocking, so they keep their normal behaviour.
+        if script.endswith('07_bug_triage.py'):
             extra = ['--no-open']
 
         if not run_stage(task, name, script, extra):
@@ -94,9 +102,11 @@ def main():
         print(f"    [DONE] {name}")
     print(f"\n  Total runtime : {time.time() - overall:.1f}s")
     print(f"  Charts        : visualizations/")
+    print(f"  Dashboard     : dashboards/bug_analytics_dashboard.html")
     print(f"  Models        : models/")
     print(f"  Results       : data/model_evaluation_results.json")
     print(f"                  data/lifecycle_analysis.json")
+    print(f"                  data/kpi_report.json")
     print("=" * 70)
     return 0
 

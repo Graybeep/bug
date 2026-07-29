@@ -33,13 +33,17 @@ The dataset is **not included** in this repository (too large for GitHub). You m
 BugManagement/
 ├── data/
 │   ├── bug_dataset_50k.csv            # Source dataset (download from Kaggle, see above)
-│   ├── bug_reports_enriched.csv       # Source + derived lifecycle fields
+│   ├── bug_reports_enriched.csv       # Source + derived lifecycle & delivery fields
 │   ├── bug_reports_processed.csv      # Cleaned & encoded dataset
 │   ├── potential_duplicates.json      # Detected duplicate bug pairs
 │   ├── lifecycle_analysis.json        # Life cycle stage / status / resolution breakdown
 │   ├── bug_knowledge_base.json        # Per-category root cause / fix / owning role
+│   ├── module_catalog.json            # Module sizes (KLOC) + SLA targets (created by 01)
+│   ├── kpi_report.json                # All KPIs + insights, machine-readable (created by 08)
 │   ├── tracked_bugs.json              # Live ticket tracker (created by 07)
 │   └── model_evaluation_results.json  # ML model metrics
+├── dashboards/
+│   └── bug_analytics_dashboard.html   # Interactive dashboard (created by 08, offline)
 ├── models/
 │   ├── label_encoders.pkl             # Fitted label encoders
 │   ├── tfidf_vectorizer.pkl           # TF-IDF vectorizer
@@ -56,6 +60,11 @@ BugManagement/
 │   ├── 05_modeling.py                 # Task 6: Train & evaluate 5 ML models per target
 │   ├── 06_predict.py                  # Task 7: Predict severity & priority
 │   ├── 07_bug_triage.py               # Task 8: Full triage — assign, diagnose, track
+│   ├── 08_dashboard.py                # Task 9: Interactive dashboard + KPI report
+│   ├── dashboard/                     # Front-end assets inlined into the HTML by 08
+│   │   ├── template.html              #   page structure
+│   │   ├── dashboard.css              #   layout & theming (light + dark)
+│   │   └── dashboard.js               #   decoding, filtering, SVG charts
 │   ├── _deps.py                       # Dependency guard (clear message if venv not active)
 │   └── present_dataset.py             # Optional: rich console summary of the dataset
 ├── visualizations/
@@ -68,11 +77,16 @@ BugManagement/
 │   ├── bugs_assigned_to_developers.png
 │   ├── bug_reporting_trend.png
 │   ├── bugs_by_module.png
-│   └── duplicate_bugs.png
+│   ├── duplicate_bugs.png
+│   ├── kpi_sprint_trend.png           # ── the five below are created by 08 ──
+│   ├── kpi_module_priority_heatmap.png
+│   ├── kpi_resolution_time_by_priority.png
+│   ├── kpi_defect_density_by_module.png
+│   └── kpi_release_quality.png
 ├── docs/
 │   ├── PROJECT_REPORT.md              # Full write-up: method, results, limitations
 │   └── PROJECT_REPORT.pdf             # Same report, rendered with charts embedded
-├── run_pipeline.py                    # Runs all 7 tasks in order
+├── run_pipeline.py                    # Runs all 9 tasks in order
 ├── requirements.txt
 └── README.md
 ```
@@ -109,10 +123,10 @@ pip install -r requirements.txt
 python run_pipeline.py
 ```
 
-Runs all 7 tasks in order, streams each stage's output to the console, and opens the 9 charts when it reaches Task 4. Takes ~35 seconds end-to-end.
+Runs all 9 tasks in order, streams each stage's output to the console, opens the 9 charts at Task 4, and opens the interactive dashboard in your browser at Task 9. Takes ~40 seconds end-to-end.
 
 ```bash
-python run_pipeline.py --no-open           # save charts without opening them
+python run_pipeline.py --no-open           # save charts + dashboard without opening them
 python run_pipeline.py --skip-duplicates   # skip Task 5 — finishes in ~40s
 ```
 
@@ -142,6 +156,9 @@ python src/06_predict.py --desc "App crashes on login with valid credentials" \
 python src/07_bug_triage.py --title "Checkout page crashes" \
        --desc "Payment page freezes after submit" \
        --error-code 500 --category "Backend Logic Bug" --environment Production
+
+# Step 9: Build the interactive dashboard + KPI report and open it in the browser
+python src/08_dashboard.py              # add --no-open to only build it
 ```
 
 > **Working directory doesn't matter.** Every script resolves its paths from the project root, so you can launch them from the project root, from inside `src/`, from an IDE's Run button, or from anywhere else — they'll always find `data/` and `models/`.
@@ -150,13 +167,14 @@ python src/07_bug_triage.py --title "Checkout page crashes" \
 
 | Stage | Console output |
 |-------|----------------|
-| `01` | Record count, column list, required-field coverage check, derived-field summary, sample rows |
+| `01` | Record count, column list, required-field coverage check, derived-field summary, **module catalog table** (size + bugs + density), sample rows for both the life cycle and delivery columns |
 | `02` | Null report, duplicate report, anomaly report, encoding maps, **cleaned data preview** (10 rows readable + the same 10 rows encoded), post-clean verification |
 | `03` | Chart-by-chart save log, 9 numbered **Observations**, then opens each PNG |
 | `04` | Duplicate pair count, **example pairs with each bug's title/category/severity/status/priority**, **duplicate group table** (size + dominant category + purity), life cycle stage table, open backlog / urgent / reopen figures, resolution mix |
 | `05` | Per-target metrics table (5 models × Accuracy/Precision/Recall/F1), best model per target, per-class classification report |
 | `06` | Input description + context, predicted **Severity** and **Priority** with triage notes |
-| `07` | 5-step triage report: reported details → cleaning → Random Forest prediction → developer assignment + root cause + suggested fix → life cycle tracking |
+| `07` | 5-step triage report: reported details → cleaning → Random Forest prediction → developer assignment + root cause + suggested fix → life cycle tracking. Pops up the assignment chart; pass `--no-open` to only save it |
+| `08` | **KPI report** in six blocks (headline KPIs, module-wise quality, priority vs SLA, team performance, release-wise quality, top root causes), then **seven actionable insights**, then the build log for the dashboard, KPI JSON and 5 charts |
 
 ---
 
@@ -172,6 +190,7 @@ python src/07_bug_triage.py --title "Checkout page crashes" \
 | 6 | Model Training & Testing | `05_modeling.py` | 5 models × 3 targets, best saved |
 | 7 | Severity & Priority Prediction | `06_predict.py` | Console prediction output |
 | 8 | End-to-End Triage & Tracking | `07_bug_triage.py` | `data/tracked_bugs.json`, lifecycle chart |
+| 9 | Interactive Dashboards & KPI Reporting | `08_dashboard.py` | `dashboards/bug_analytics_dashboard.html`, `data/kpi_report.json`, 5 KPI charts |
 
 ---
 
@@ -198,7 +217,9 @@ python src/07_bug_triage.py --title "Checkout page crashes" \
 
 ## 🧬 Derived Fields (added by `01_data_collection.py`)
 
-The milestone requires **Status**, **Priority** and **Resolution**, plus analysis of the **bug life cycle**. The Kaggle dataset ships none of these — it has no workflow state at all. Rather than swap datasets, `01_data_collection.py` derives them deterministically (`seed=42`, so every run is reproducible) and writes `data/bug_reports_enriched.csv`.
+The milestone requires **Status**, **Priority** and **Resolution**, plus analysis of the **bug life cycle**; the dashboard task additionally requires **Sprint**, **Release Version**, **Module**, **Feature**, **Component** and **Date Closed**. The Kaggle dataset ships none of these — it has no workflow state and no delivery taxonomy at all. Rather than swap datasets, `01_data_collection.py` derives them deterministically (`seed=42`, so every run is reproducible) and writes `data/bug_reports_enriched.csv`.
+
+### Life cycle fields
 
 | Field | Values | How it's derived |
 |-------|--------|------------------|
@@ -206,6 +227,26 @@ The milestone requires **Status**, **Priority** and **Resolution**, plus analysi
 | `lifecycle_stage` | Reported → In Progress → Resolved → Verification → Closed | Deterministic mapping from `status` |
 | `resolution` | Fixed, Unresolved, Duplicate, Invalid, Won't Fix | Deterministic mapping from `status` |
 | `priority` | P1 (highest) … P5 (lowest) | Impact score, below |
+
+### Delivery-tracking fields
+
+| Field | Values | How it's derived |
+|-------|--------|------------------|
+| `sprint` | `SPR-01` … `SPR-26` | 14-day buckets counted from the earliest `created_at`. The data ends mid-sprint, so the trailing 2-day stub is folded into the last full sprint — on its own it would plot beside 14-day bars and read as a collapse in intake |
+| `release_version` | `v1.0` … `v3.2` (9 releases) | 3 sprints per release; major version bumps every 3 releases |
+| `module` | Web Portal, Mobile App, Core Services, Data Platform, Cloud Infrastructure, Delivery Pipeline | Fixed map from `bug_domain` — which product area owns the defect |
+| `feature` | Login & SSO, Public API, Persistence Layer, … (16) | Fixed map from `bug_category` — which user-facing capability it breaks |
+| `component` | `svc-spring-core`, `web-ui-react`, `db-postgres`, … (16) | Fixed map from `tech_stack` — which deployable/code unit it lives in |
+| `date_closed` | Date, or null while the bug is open | Set only for the four terminal statuses (Closed, Duplicate, Rejected, Deferred) — 28.3% of rows |
+| `resolution_days` | 0 – 311 days, or null | `date_closed − created_at` |
+
+Module, feature and component are three **independent axes** of the taxonomy, not a strict tree: a feature can span several components, exactly as it does in a real product. Their source columns are independent in the Kaggle data, so a Mobile-domain bug can carry a `Public API` feature.
+
+**Days-to-close model.** Each closed bug draws a duration from a log-normal spread around a median set by its priority (P1 2d · P2 5d · P3 12d · P4 25d · P5 60d), scaled by how it was resolved (Duplicate ×0.3, Invalid ×0.4, Won't Fix ×2.0). Where a drawn duration would run past the snapshot date the duration is **redrawn uniformly inside the days actually remaining** — truncating it to the snapshot instead would stack every one of those closures onto the final date and invent a closure spike in the last sprint.
+
+**SLA targets** (used for compliance KPIs, published in `data/module_catalog.json`): P1 3 days · P2 7 · P3 14 · P4 30 · P5 60.
+
+**Module sizes in KLOC** are fixed project constants, also in `data/module_catalog.json` — defect density needs a size denominator and the dataset carries no code-size metric. They are an assumption, so treat density as "bugs per unit of assumed module size", not a measurement.
 
 **Priority scoring rule:**
 
@@ -222,7 +263,7 @@ score = severity_weight + environment_weight + blocking_error_weight
 
 About 8% of rows are nudged one level up or down (seeded) to reflect the fact that real triage isn't a closed-form lookup — this keeps the target learnable without being a trivial identity function.
 
-> **These four fields are derived, not observed.** They make the life cycle, status, priority and resolution stages of this project analysable and reproducible, but they are a modelled triage policy layered on the Kaggle data — not ground truth from a real issue tracker. Any conclusion about priority is a conclusion about that policy.
+> **All of these fields are derived, not observed.** They make the life cycle, triage, sprint and KPI stages of this project analysable and reproducible, but they are a modelled delivery process layered on the Kaggle data — not ground truth from a real issue tracker. Any conclusion about priority, sprint velocity or defect density is a conclusion about that model.
 
 ---
 
@@ -312,8 +353,64 @@ Looked up from `data/bug_knowledge_base.json`, built by `01_data_collection.py`.
 | Bugs by Tech Stack | Bar chart of bugs per technology | `03` |
 | Duplicate vs Unique Bugs | Duplicate detection result | `04` |
 | Tracked Bug Life Cycle | Ticket status counts + per-ticket progress bars | `07` |
+| Sprint Intake vs Closure | Opened/closed bars per sprint + carried-over backlog line | `08` |
+| Module × Priority Heatmap | Where the urgent work concentrates | `08` |
+| Resolution Time vs SLA | Average days to close per priority against its SLA target | `08` |
+| Defect Density by Module | Bugs per KLOC, volume normalised by module size | `08` |
+| Release-wise Quality | Closed vs still-open bugs stacked per release | `08` |
 
 All charts are saved to the `visualizations/` folder **and opened in your default image viewer** when the script runs. Pass `--no-open` to only save them.
+
+---
+
+## 📊 Interactive Dashboard & KPI Reporting (`08_dashboard.py`)
+
+Stage 9 turns the bug records into an **interactive dashboard** plus a **KPI report** and a set of **actionable insights**.
+
+```bash
+python src/08_dashboard.py                # build the dashboard and open it
+python src/08_dashboard.py --no-open      # build only
+python src/08_dashboard.py --top 15       # widen the "top N root causes" table
+```
+
+### The dashboard
+
+`dashboards/bug_analytics_dashboard.html` is a **single self-contained file** — no server, no CDN, no network access. Open it by double-clicking. It embeds all 50,000 records as character-encoded columns (≈0.7 MB) and redraws every chart in the browser whenever a filter changes, so the KPI strip and all twelve panels always describe one consistent selection.
+
+**Filter on any of 12 dimensions** — Release version, Sprint, Module, Feature, Component, Priority, Severity, Status, Resolution, Root cause, Team, Environment. Filters combine, and **clicking any bar, donut wedge or heatmap cell** applies that value as a filter (click again to clear it).
+
+| Panel | Shows |
+|-------|-------|
+| KPI strip | Bugs in scope, closed, still open, avg days to close, SLA compliance, open past SLA, defect density, reopen rate |
+| Sprint-wise intake, closure & backlog | Opened vs closed bars per sprint with the carried-over backlog line |
+| Bug status | All 11 workflow states in life cycle order |
+| Resolution outcome | Donut of Fixed / Unresolved / Duplicate / Invalid / Won't Fix |
+| Module-wise distribution | Bug volume per product module |
+| Priority distribution | P1–P5 volume |
+| Defect density by module | Bugs per KLOC |
+| Resolution time vs SLA | Average days to close per priority, with the SLA target marked |
+| Module × Priority | Heatmap of where urgent work concentrates |
+| Top root causes / Top affected features | Ranked bars, with average days-to-close on hover |
+| Release-wise quality | Bugs, closed, open, P1/P2, avg days, close rate per release |
+| Team performance | Assigned, closed, open, open P1/P2, avg days, close rate, SLA met per owning role |
+
+### KPIs computed
+
+| KPI | Definition |
+|-----|------------|
+| Close rate | Closed bugs ÷ total bugs |
+| Avg / median / p90 resolution time | Days from `created_at` to `date_closed`, over closed bugs only |
+| SLA compliance | Closed bugs whose `resolution_days` ≤ their priority's target |
+| Open past SLA | Open bugs whose age at the snapshot already exceeds their target |
+| Defect density | Bugs ÷ module size in KLOC |
+| Reopen rate | Share of bugs currently in `Reopened` |
+| Sprint backlog | Cumulative (opened − closed) per sprint |
+
+Everything is also written to **`data/kpi_report.json`** — headline KPIs plus per-sprint, per-module, per-release, per-priority, per-root-cause and per-team breakdowns, and the insights — so the numbers can be consumed without re-parsing the CSV.
+
+### Team performance uses the routed owner
+
+The dataset's own `developer_role` column is **uniformly random** — every role appears ~11.1% of the time inside every category (see *Known Data Limitations*), so grouping by it produces nine near-identical rows. The team KPIs therefore group by the **routing-policy owner** (bug category → specialist, with a Mobile-domain override), the same policy `07_bug_triage.py` assigns with. That reflects the workload the policy actually creates.
 
 ---
 
@@ -369,6 +466,14 @@ Read all three columns against the **Known Data Limitations** below before treat
 12. **Angular** has the highest bug count by tech stack (3,300 bugs)
 13. **780,515** potential duplicate pairs detected via cosine similarity (threshold > 0.85, 5k sample) — see the data limitation on duplicate detection below before reading this as genuine duplication.
 
+**KPIs (from `08_dashboard.py`, over the derived delivery fields):**
+
+14. **28.3% close rate** — 14,148 of 50,000 bugs closed; the backlog grows in 26 of 27 sprints and ends at 35,852 open
+15. **Average 16.8 days to close** (median 9, p90 42); **77.6% of closed bugs met their priority's SLA**
+16. **P3 is the weakest SLA queue** at 70.5% compliance against a 14-day target; P1 is strongest at 86.9%
+17. **Delivery Pipeline has the highest defect density** — 263.8 bugs per KLOC, 4.4× Core Services (59.5), on nearly identical bug counts
+18. **The routing policy concentrates 26.0% of all bugs on Backend Developer** (13,004) versus 5.2% on Data Engineer (2,586), while turnaround varies by under 2 days across all seven roles (15.7–17.2)
+
 ---
 
 ## ⚠️ Known Data Limitations
@@ -388,6 +493,14 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 
 6. **Status and resolution distributions** are sampled from a plausible workflow distribution, not observed from a tracker, so the open-backlog and reopen-rate figures describe the derivation, not real-world team behaviour.
 
+7. **Consequence for `08_dashboard.py` — the open backlog skews old.** `status` is drawn independently of `created_at`, so a bug reported in the first week is exactly as likely to still be "New" as one reported yesterday. The dashboard therefore reports a very high *open past SLA* figure (~93% of the open queue) and a ~182-day average open age. Both are arithmetically correct for this data; neither is a realistic aging profile, because a real tracker closes old bugs faster than new ones.
+
+8. **Consequence for `08_dashboard.py` — closures bunch into the final sprints.** The same independence means ~28% of bugs reported near the snapshot date are marked closed, and those closures can only land in the days that remain. The last one or two sprints therefore show more closures than a steady state would produce. The duration redraw (see *Derived Fields*) spreads them across the remaining window rather than piling them on the final day, but it cannot remove the effect.
+
+9. **Release- and module-level *rates* are within noise.** Because closure is independent of both, every release lands within ~1.5 points of the same ~28% close rate and every module within ~1.3 points, on near-identical bug counts (8,225–8,477). What genuinely separates them is **volume** and, for modules, the **assumed KLOC baseline** — which is why the insights rank on absolute queue size and defect density rather than on closure rate.
+
+10. **Team differences are structural, not behavioural.** Turnaround across the seven routed owners spans only 15.7–17.2 days, because priority mix is near-identical across categories. The meaningful signal is queue length: the routing policy sends 26.0% of all bugs to Backend Developer and 5.2% to Data Engineer.
+
 ---
 
 ## 🩺 Troubleshooting
@@ -396,6 +509,9 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 |---|---|---|
 | `ModuleNotFoundError: No module named 'matplotlib'` (or pandas/sklearn/seaborn) | Running with system Python instead of the venv | Activate the venv (`venv\Scripts\activate`) or call `venv\Scripts\python.exe` directly. The scripts print the exact command. |
 | No charts appear, no error | Charts were saved but not opened | They're in `visualizations/`. Auto-open is on by default; `--no-open` disables it. |
+| Dashboard opens blank or unstyled | The HTML was moved but is otherwise fine — it needs no sibling files | Re-run `python src/08_dashboard.py`. The file is fully self-contained; CSS and JS are inlined at build time. |
+| Pipeline appears to freeze after Task 8 | Stage 7's chart window is modal, so a direct `python src/07_bug_triage.py` waits for you to close it | Close the chart window. `run_pipeline.py` passes `--no-open` to stage 7 for exactly this reason, so the full run never blocks. |
+| `[ERROR] ... is missing: sprint, module, ...` from stage 08 | `bug_reports_processed.csv` predates the delivery fields | Re-run stages 01 and 02, then 08. |
 | `[ERROR] Dataset not found` | `bug_dataset_50k.csv` missing, or `01_data_collection.py` hasn't run yet | Download the CSV into `data/`, then run stage 01. The error prints the absolute path it looked for. |
 | Stage 5 feels slow | It builds a 5,000×5,000 similarity matrix | Now vectorized — runs in ~4s. Use `--skip-duplicates` only if you want to skip it entirely. |
 
@@ -407,4 +523,5 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 - **Data:** Pandas, NumPy
 - **ML:** scikit-learn (TF-IDF, Naïve Bayes, Logistic Regression, Decision Tree, Random Forest, SVM)
 - **Visualization:** Matplotlib, Seaborn
+- **Dashboard:** self-contained HTML + vanilla JS/SVG — no charting library, no CDN, works offline
 - **Persistence:** joblib (model serialization)

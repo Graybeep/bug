@@ -29,6 +29,11 @@ os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ENRICHED_PATH = 'data/bug_reports_enriched.csv'
 RAW_PATH      = 'data/bug_dataset_50k.csv'
 
+# Columns that are null *by design*: a bug that has not left the board has no
+# close date and no time-to-close. Filling or dropping these would fabricate
+# closures, so they are reported separately and left alone.
+EXPECTED_NULL_COLS = ['date_closed', 'resolution_days']
+
 def preprocess_data(file_path=None):
     print("=" * 60)
     print("  TASK 3: Data Preprocessing")
@@ -72,10 +77,18 @@ def preprocess_data(file_path=None):
     null_report = pd.DataFrame({'Null Count': null_counts, 'Null %': null_pct})
     null_report = null_report[null_report['Null Count'] > 0]
 
-    if null_report.empty:
-        print("  No null values found in any column.")
+    expected = [c for c in EXPECTED_NULL_COLS if c in null_report.index]
+    unexpected_nulls = null_report.drop(index=expected)
+
+    if unexpected_nulls.empty:
+        print("  No unexpected null values found in any column.")
     else:
-        print(null_report.to_string())
+        print(unexpected_nulls.to_string())
+
+    if expected:
+        print(f"\n  Nulls that are correct by design (open bugs have no closure):")
+        print('\n'.join('    ' + line for line in
+                        null_report.loc[expected].to_string().split('\n')))
 
     # Fix nulls — fill text columns with empty string, drop rows missing key fields
     text_cols    = [c for c in ['title', 'description', 'root_cause', 'suggested_fix', 'explanation'] if c in df.columns]
@@ -168,6 +181,47 @@ def preprocess_data(file_path=None):
         if unmapped > 0:
             anomalies_found = True
 
+    # Delivery taxonomy must be fully populated — an unmapped domain/category/
+    # stack would silently drop a whole slice out of the dashboard filters.
+    for col, fallback in (('module',    'Unassigned Module'),
+                          ('feature',   'Unassigned Feature'),
+                          ('component', 'unassigned-component')):
+        if col in df.columns:
+            unmapped = int((df[col] == fallback).sum())
+            print(f"  {f'Unmapped {col!r} values':<29}: {unmapped}")
+            if unmapped > 0:
+                anomalies_found = True
+
+    # A close date before the report date, or a negative age, is impossible.
+    if 'date_closed' in df.columns and 'created_at' in df.columns:
+        created = pd.to_datetime(df['created_at'], errors='coerce')
+        closed  = pd.to_datetime(df['date_closed'], errors='coerce')
+        backwards = int((closed < created).sum())
+        print(f"  Closed-before-reported bugs  : {backwards}")
+        if backwards > 0:
+            anomalies_found = True
+
+    if 'resolution_days' in df.columns:
+        rd = df['resolution_days'].dropna()
+        negative = int((rd < 0).sum())
+        print(f"  Negative 'resolution_days'   : {negative}")
+        if negative > 0:
+            anomalies_found = True
+        if len(rd) > 0:
+            print(f"  'resolution_days' range      : {rd.min():.0f} - {rd.max():.0f} "
+                  f"days (median {rd.median():.0f})")
+
+    # Every closed bug needs a close date and vice versa, or the resolution-time
+    # KPIs would be computed over an inconsistent population.
+    if {'status', 'date_closed'} <= set(df.columns):
+        closed_statuses = {'Closed', 'Duplicate', 'Rejected', 'Deferred'}
+        is_closed  = df['status'].isin(closed_statuses)
+        has_date   = df['date_closed'].notna()
+        mismatched = int((is_closed != has_date).sum())
+        print(f"  Closure date/status mismatches: {mismatched}")
+        if mismatched > 0:
+            anomalies_found = True
+
     # error_code outliers (numerical)
     if 'error_code' in df.columns:
         ec = df['error_code'].dropna()
@@ -192,7 +246,8 @@ def preprocess_data(file_path=None):
     encoders = {}
     categorical_cols = ['severity', 'priority', 'status', 'lifecycle_stage',
                         'resolution', 'bug_category', 'bug_domain', 'tech_stack',
-                        'environment', 'developer_role']
+                        'environment', 'developer_role', 'module', 'feature',
+                        'component', 'release_version']
     for col in categorical_cols:
         if col in df.columns:
             le = LabelEncoder()
@@ -211,8 +266,13 @@ def preprocess_data(file_path=None):
     print("-" * 60)
 
     # Verify the cleaning actually worked
+    unexpected_cols = [c for c in df.columns if c not in EXPECTED_NULL_COLS]
+    by_design = int(df[[c for c in EXPECTED_NULL_COLS if c in df.columns]]
+                    .isnull().sum().sum()) if any(c in df.columns for c in EXPECTED_NULL_COLS) else 0
+
     print(f"\n  Post-clean verification:")
-    print(f"    Remaining null values     : {int(df.isnull().sum().sum())}")
+    print(f"    Remaining null values     : {int(df[unexpected_cols].isnull().sum().sum())}")
+    print(f"    Nulls kept by design      : {by_design:,}  (open bugs, no close date)")
     print(f"    Remaining duplicate IDs   : {int(df.duplicated(subset=[id_col]).sum())}")
     print(f"    Rows x Columns            : {df.shape[0]:,} x {df.shape[1]}")
 
@@ -223,6 +283,14 @@ def preprocess_data(file_path=None):
     print(f"\n  Cleaned data — first 10 rows (readable columns):")
     print('\n'.join('    ' + line for line in
                     df[preview_cols].head(10).to_string(index=False).split('\n')))
+
+    delivery_cols = [c for c in ['bug_id', 'sprint', 'release_version', 'module',
+                                 'feature', 'component', 'date_closed',
+                                 'resolution_days'] if c in df.columns]
+    if len(delivery_cols) > 1:
+        print(f"\n  Same rows — delivery columns (dashboard dimensions):")
+        print('\n'.join('    ' + line for line in
+                        df[delivery_cols].head(10).to_string(index=False).split('\n')))
 
     # Same rows, encoded — shows the categorical -> numerical conversion
     enc_cols = [c for c in ['severity_encoded', 'priority_encoded', 'status_encoded',
@@ -250,7 +318,8 @@ def preprocess_data(file_path=None):
     print("=" * 60)
     print(f"  Original records : {total_records:,}")
     print(f"  Cleaned records  : {len(df):,}  ({len(df.columns)} columns)")
-    print(f"  Nulls remaining  : {int(df.isnull().sum().sum())}")
+    print(f"  Nulls remaining  : {int(df[unexpected_cols].isnull().sum().sum())}"
+          f"  (+{by_design:,} by design on open bugs)")
     print(f"  Output CSV       : {output_path}")
     print(f"  Encoders saved   : models/label_encoders.pkl")
     print("=" * 60)

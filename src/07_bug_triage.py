@@ -226,7 +226,7 @@ def triage_bug(args, models, kb, tickets):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Graph: all bugs by who they were assigned to
 # ──────────────────────────────────────────────────────────────────────────────
-def chart_assignments(tickets):
+def chart_assignments(tickets, show=True):
     if not tickets:
         return None
 
@@ -252,7 +252,11 @@ def chart_assignments(tickets):
 
     fig.tight_layout()
     fig.savefig(CHART_PATH, dpi=150, bbox_inches='tight')
-    plt.show()          # pop the chart window up after the run
+    # plt.show() is modal: it blocks until the window is closed by hand. That is
+    # fine when this script is run on its own, but it would stall run_pipeline.py
+    # part-way through, so the runner passes --no-open.
+    if show:
+        plt.show()      # pop the chart window up after the run
     plt.close(fig)
     return CHART_PATH
 
@@ -260,7 +264,7 @@ def chart_assignments(tickets):
 # ──────────────────────────────────────────────────────────────────────────────
 #  Entry points
 # ──────────────────────────────────────────────────────────────────────────────
-def run(bugs, models, kb, tickets):
+def run(bugs, models, kb, tickets, show_chart=True):
     new_tickets = []
     for bug in bugs:
         a = argparse.Namespace(
@@ -272,7 +276,7 @@ def run(bugs, models, kb, tickets):
 
     save_tracker(tickets)
     # Chart only the bugs triaged in this run.
-    chart = chart_assignments(new_tickets)
+    chart = chart_assignments(new_tickets, show=show_chart)
     if chart:
         print(f"  Chart saved: {chart}")
 
@@ -300,6 +304,9 @@ def main():
                    help="Random seed for the data sample")
     p.add_argument('--reset', action='store_true',
                    help="Clear the tracker before running")
+    p.add_argument('--no-open', dest='show_chart', action='store_false',
+                   help="Only save the assignment chart; do not pop up its window")
+    p.set_defaults(show_chart=True)
     args = p.parse_args()
 
     if args.reset and os.path.exists(TRACKER_PATH):
@@ -325,7 +332,7 @@ def main():
         if bugs is None:
             return 1
 
-    run(bugs, models, kb, tickets)
+    run(bugs, models, kb, tickets, show_chart=args.show_chart)
     return 0
 
 

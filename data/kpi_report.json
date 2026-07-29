@@ -1,0 +1,857 @@
+{
+    "generated_at": "2026-07-28 23:55:14",
+    "headline": {
+        "total_bugs": 50000,
+        "closed_bugs": 14148,
+        "open_bugs": 35852,
+        "close_rate_pct": 28.3,
+        "avg_resolution_days": 16.8,
+        "median_resolution_days": 9.0,
+        "p90_resolution_days": 42.0,
+        "sla_compliance_pct": 77.6,
+        "open_past_sla": 33528,
+        "avg_open_age_days": 182.4,
+        "defect_density": 104.4,
+        "total_kloc": 479.1,
+        "reopen_rate_pct": 4.89,
+        "snapshot_date": "2026-02-02"
+    },
+    "sla_targets": {
+        "P1": 3,
+        "P2": 7,
+        "P3": 14,
+        "P4": 30,
+        "P5": 60
+    },
+    "by_sprint": [
+        {
+            "sprint": "SPR-01",
+            "opened": 1989,
+            "closed": 208,
+            "backlog": 1781,
+            "avg_days": 18.1
+        },
+        {
+            "sprint": "SPR-02",
+            "opened": 1889,
+            "closed": 392,
+            "backlog": 3278,
+            "avg_days": 19.0
+        },
+        {
+            "sprint": "SPR-03",
+            "opened": 1926,
+            "closed": 508,
+            "backlog": 4696,
+            "avg_days": 17.6
+        },
+        {
+            "sprint": "SPR-04",
+            "opened": 1839,
+            "closed": 473,
+            "backlog": 6062,
+            "avg_days": 18.7
+        },
+        {
+            "sprint": "SPR-05",
+            "opened": 1852,
+            "closed": 489,
+            "backlog": 7425,
+            "avg_days": 19.8
+        },
+        {
+            "sprint": "SPR-06",
+            "opened": 1952,
+            "closed": 525,
+            "backlog": 8852,
+            "avg_days": 18.9
+        },
+        {
+            "sprint": "SPR-07",
+            "opened": 1920,
+            "closed": 529,
+            "backlog": 10243,
+            "avg_days": 19.6
+        },
+        {
+            "sprint": "SPR-08",
+            "opened": 1886,
+            "closed": 541,
+            "backlog": 11588,
+            "avg_days": 17.4
+        },
+        {
+            "sprint": "SPR-09",
+            "opened": 1909,
+            "closed": 520,
+            "backlog": 12977,
+            "avg_days": 18.0
+        },
+        {
+            "sprint": "SPR-10",
+            "opened": 1900,
+            "closed": 522,
+            "backlog": 14355,
+            "avg_days": 20.0
+        },
+        {
+            "sprint": "SPR-11",
+            "opened": 1922,
+            "closed": 531,
+            "backlog": 15746,
+            "avg_days": 18.3
+        },
+        {
+            "sprint": "SPR-12",
+            "opened": 1943,
+            "closed": 534,
+            "backlog": 17155,
+            "avg_days": 19.1
+        },
+        {
+            "sprint": "SPR-13",
+            "opened": 1926,
+            "closed": 510,
+            "backlog": 18571,
+            "avg_days": 19.4
+        },
+        {
+            "sprint": "SPR-14",
+            "opened": 1949,
+            "closed": 552,
+            "backlog": 19968,
+            "avg_days": 18.7
+        },
+        {
+            "sprint": "SPR-15",
+            "opened": 1889,
+            "closed": 560,
+            "backlog": 21297,
+            "avg_days": 18.3
+        },
+        {
+            "sprint": "SPR-16",
+            "opened": 1963,
+            "closed": 499,
+            "backlog": 22761,
+            "avg_days": 18.0
+        },
+        {
+            "sprint": "SPR-17",
+            "opened": 1915,
+            "closed": 540,
+            "backlog": 24136,
+            "avg_days": 18.3
+        },
+        {
+            "sprint": "SPR-18",
+            "opened": 1845,
+            "closed": 508,
+            "backlog": 25473,
+            "avg_days": 18.7
+        },
+        {
+            "sprint": "SPR-19",
+            "opened": 1852,
+            "closed": 569,
+            "backlog": 26756,
+            "avg_days": 17.0
+        },
+        {
+            "sprint": "SPR-20",
+            "opened": 1918,
+            "closed": 530,
+            "backlog": 28144,
+            "avg_days": 17.1
+        },
+        {
+            "sprint": "SPR-21",
+            "opened": 1913,
+            "closed": 567,
+            "backlog": 29490,
+            "avg_days": 16.0
+        },
+        {
+            "sprint": "SPR-22",
+            "opened": 1942,
+            "closed": 550,
+            "backlog": 30882,
+            "avg_days": 15.7
+        },
+        {
+            "sprint": "SPR-23",
+            "opened": 1928,
+            "closed": 576,
+            "backlog": 32234,
+            "avg_days": 13.9
+        },
+        {
+            "sprint": "SPR-24",
+            "opened": 1868,
+            "closed": 547,
+            "backlog": 33555,
+            "avg_days": 11.5
+        },
+        {
+            "sprint": "SPR-25",
+            "opened": 1942,
+            "closed": 666,
+            "backlog": 34831,
+            "avg_days": 9.0
+        },
+        {
+            "sprint": "SPR-26",
+            "opened": 2223,
+            "closed": 1202,
+            "backlog": 35852,
+            "avg_days": 3.6
+        }
+    ],
+    "by_module": [
+        {
+            "module": "Delivery Pipeline",
+            "bugs": 8364,
+            "closed": 2320,
+            "open": 6044,
+            "critical": 2076,
+            "urgent": 2917,
+            "size_kloc": 31.7,
+            "defect_density": 263.8,
+            "avg_days": 16.3,
+            "close_rate_pct": 27.7
+        },
+        {
+            "module": "Cloud Infrastructure",
+            "bugs": 8322,
+            "closed": 2326,
+            "open": 5996,
+            "critical": 2054,
+            "urgent": 2864,
+            "size_kloc": 45.3,
+            "defect_density": 183.7,
+            "avg_days": 16.2,
+            "close_rate_pct": 28.0
+        },
+        {
+            "module": "Mobile App",
+            "bugs": 8311,
+            "closed": 2408,
+            "open": 5903,
+            "critical": 2076,
+            "urgent": 2849,
+            "size_kloc": 74.8,
+            "defect_density": 111.1,
+            "avg_days": 16.4,
+            "close_rate_pct": 29.0
+        },
+        {
+            "module": "Data Platform",
+            "bugs": 8301,
+            "closed": 2363,
+            "open": 5938,
+            "critical": 2058,
+            "urgent": 2843,
+            "size_kloc": 88.6,
+            "defect_density": 93.7,
+            "avg_days": 17.6,
+            "close_rate_pct": 28.5
+        },
+        {
+            "module": "Web Portal",
+            "bugs": 8225,
+            "closed": 2352,
+            "open": 5873,
+            "critical": 2008,
+            "urgent": 2775,
+            "size_kloc": 96.2,
+            "defect_density": 85.5,
+            "avg_days": 17.1,
+            "close_rate_pct": 28.6
+        },
+        {
+            "module": "Core Services",
+            "bugs": 8477,
+            "closed": 2379,
+            "open": 6098,
+            "critical": 2160,
+            "urgent": 2927,
+            "size_kloc": 142.5,
+            "defect_density": 59.5,
+            "avg_days": 17.1,
+            "close_rate_pct": 28.1
+        }
+    ],
+    "by_release": [
+        {
+            "release": "v1.0",
+            "bugs": 5804,
+            "closed": 1702,
+            "open": 4102,
+            "urgent": 2024,
+            "urgent_open": 1432,
+            "avg_days": 18.2,
+            "close_rate_pct": 29.3
+        },
+        {
+            "release": "v1.1",
+            "bugs": 5643,
+            "closed": 1569,
+            "open": 4074,
+            "urgent": 1889,
+            "urgent_open": 1350,
+            "avg_days": 19.1,
+            "close_rate_pct": 27.8
+        },
+        {
+            "release": "v1.2",
+            "bugs": 5715,
+            "closed": 1608,
+            "open": 4107,
+            "urgent": 1925,
+            "urgent_open": 1366,
+            "avg_days": 18.3,
+            "close_rate_pct": 28.1
+        },
+        {
+            "release": "v2.0",
+            "bugs": 5765,
+            "closed": 1605,
+            "open": 4160,
+            "urgent": 1962,
+            "urgent_open": 1409,
+            "avg_days": 19.2,
+            "close_rate_pct": 27.8
+        },
+        {
+            "release": "v2.1",
+            "bugs": 5764,
+            "closed": 1622,
+            "open": 4142,
+            "urgent": 1978,
+            "urgent_open": 1423,
+            "avg_days": 18.8,
+            "close_rate_pct": 28.1
+        },
+        {
+            "release": "v2.2",
+            "bugs": 5723,
+            "closed": 1590,
+            "open": 4133,
+            "urgent": 1989,
+            "urgent_open": 1450,
+            "avg_days": 18.3,
+            "close_rate_pct": 27.8
+        },
+        {
+            "release": "v3.0",
+            "bugs": 5683,
+            "closed": 1584,
+            "open": 4099,
+            "urgent": 1923,
+            "urgent_open": 1387,
+            "avg_days": 16.7,
+            "close_rate_pct": 27.9
+        },
+        {
+            "release": "v3.1",
+            "bugs": 5738,
+            "closed": 1646,
+            "open": 4092,
+            "urgent": 2001,
+            "urgent_open": 1432,
+            "avg_days": 13.8,
+            "close_rate_pct": 28.7
+        },
+        {
+            "release": "v3.2",
+            "bugs": 4165,
+            "closed": 1222,
+            "open": 2943,
+            "urgent": 1484,
+            "urgent_open": 1065,
+            "avg_days": 6.2,
+            "close_rate_pct": 29.3
+        }
+    ],
+    "by_priority": [
+        {
+            "priority": "P1",
+            "bugs": 7334,
+            "closed": 2097,
+            "sla_target_days": 3,
+            "avg_days": 2.1,
+            "median_days": 2.0,
+            "sla_pct": 86.9
+        },
+        {
+            "priority": "P2",
+            "bugs": 9841,
+            "closed": 2764,
+            "sla_target_days": 7,
+            "avg_days": 5.2,
+            "median_days": 4.0,
+            "sla_pct": 79.1
+        },
+        {
+            "priority": "P3",
+            "bugs": 12435,
+            "closed": 3561,
+            "sla_target_days": 14,
+            "avg_days": 11.9,
+            "median_days": 10.0,
+            "sla_pct": 70.8
+        },
+        {
+            "priority": "P4",
+            "bugs": 10867,
+            "closed": 2997,
+            "sla_target_days": 30,
+            "avg_days": 23.3,
+            "median_days": 19.0,
+            "sla_pct": 74.0
+        },
+        {
+            "priority": "P5",
+            "bugs": 9523,
+            "closed": 2729,
+            "sla_target_days": 60,
+            "avg_days": 39.0,
+            "median_days": 32.0,
+            "sla_pct": 81.7
+        }
+    ],
+    "by_root_cause": [
+        {
+            "root_cause": "Misconfiguration or logic issue related to memory leak",
+            "bugs": 3220,
+            "share_pct": 6.4,
+            "avg_days": 17.0,
+            "urgent": 1084
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to logging bug",
+            "bugs": 3194,
+            "share_pct": 6.4,
+            "avg_days": 16.6,
+            "urgent": 1092
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to cloud configuration bug",
+            "bugs": 3181,
+            "share_pct": 6.4,
+            "avg_days": 16.4,
+            "urgent": 1140
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to ui bug",
+            "bugs": 3167,
+            "share_pct": 6.3,
+            "avg_days": 15.9,
+            "urgent": 1073
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to deployment bug",
+            "bugs": 3153,
+            "share_pct": 6.3,
+            "avg_days": 16.0,
+            "urgent": 1108
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to authorization bug",
+            "bugs": 3152,
+            "share_pct": 6.3,
+            "avg_days": 16.9,
+            "urgent": 1055
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to api bug",
+            "bugs": 3141,
+            "share_pct": 6.3,
+            "avg_days": 17.0,
+            "urgent": 1072
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to concurrency bug",
+            "bugs": 3130,
+            "share_pct": 6.3,
+            "avg_days": 16.5,
+            "urgent": 1097
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to monitoring bug",
+            "bugs": 3121,
+            "share_pct": 6.2,
+            "avg_days": 16.8,
+            "urgent": 1077
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to security vulnerability",
+            "bugs": 3121,
+            "share_pct": 6.2,
+            "avg_days": 16.6,
+            "urgent": 1071
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to performance bug",
+            "bugs": 3100,
+            "share_pct": 6.2,
+            "avg_days": 17.2,
+            "urgent": 1080
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to backend logic bug",
+            "bugs": 3095,
+            "share_pct": 6.2,
+            "avg_days": 18.5,
+            "urgent": 985
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to authentication bug",
+            "bugs": 3083,
+            "share_pct": 6.2,
+            "avg_days": 17.4,
+            "urgent": 1070
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to database bug",
+            "bugs": 3082,
+            "share_pct": 6.2,
+            "avg_days": 15.0,
+            "urgent": 1123
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to ci/cd bug",
+            "bugs": 3075,
+            "share_pct": 6.2,
+            "avg_days": 17.8,
+            "urgent": 1039
+        },
+        {
+            "root_cause": "Misconfiguration or logic issue related to frontend routing bug",
+            "bugs": 2985,
+            "share_pct": 6.0,
+            "avg_days": 16.8,
+            "urgent": 1009
+        }
+    ],
+    "by_team": [
+        {
+            "team": "Backend Developer",
+            "assigned": 13004,
+            "closed": 3632,
+            "open": 9372,
+            "urgent_open": 3145,
+            "avg_days": 17.2,
+            "sla_pct": 76.3,
+            "close_rate_pct": 27.9
+        },
+        {
+            "team": "DevOps Engineer",
+            "assigned": 10589,
+            "closed": 2989,
+            "open": 7600,
+            "urgent_open": 2602,
+            "avg_days": 16.8,
+            "sla_pct": 77.6,
+            "close_rate_pct": 28.2
+        },
+        {
+            "team": "Mobile Developer",
+            "assigned": 8311,
+            "closed": 2408,
+            "open": 5903,
+            "urgent_open": 2009,
+            "avg_days": 16.4,
+            "sla_pct": 78.2,
+            "close_rate_pct": 29.0
+        },
+        {
+            "team": "Security Engineer",
+            "assigned": 7746,
+            "closed": 2191,
+            "open": 5555,
+            "urgent_open": 1940,
+            "avg_days": 17.0,
+            "sla_pct": 76.8,
+            "close_rate_pct": 28.3
+        },
+        {
+            "team": "Frontend Developer",
+            "assigned": 5151,
+            "closed": 1481,
+            "open": 3670,
+            "urgent_open": 1235,
+            "avg_days": 16.3,
+            "sla_pct": 78.4,
+            "close_rate_pct": 28.8
+        },
+        {
+            "team": "Cloud Engineer",
+            "assigned": 2613,
+            "closed": 734,
+            "open": 1879,
+            "urgent_open": 698,
+            "avg_days": 16.9,
+            "sla_pct": 79.6,
+            "close_rate_pct": 28.1
+        },
+        {
+            "team": "Data Engineer",
+            "assigned": 2586,
+            "closed": 713,
+            "open": 1873,
+            "urgent_open": 685,
+            "avg_days": 15.7,
+            "sla_pct": 81.1,
+            "close_rate_pct": 27.6
+        }
+    ],
+    "status": [
+        {
+            "label": "New",
+            "value": 4941
+        },
+        {
+            "label": "Assigned",
+            "value": 5040
+        },
+        {
+            "label": "In Progress",
+            "value": 6974
+        },
+        {
+            "label": "Fixed",
+            "value": 6844
+        },
+        {
+            "label": "Pending Retest",
+            "value": 4580
+        },
+        {
+            "label": "Verified",
+            "value": 5026
+        },
+        {
+            "label": "Closed",
+            "value": 10142
+        },
+        {
+            "label": "Reopened",
+            "value": 2447
+        },
+        {
+            "label": "Duplicate",
+            "value": 2002
+        },
+        {
+            "label": "Rejected",
+            "value": 1481
+        },
+        {
+            "label": "Deferred",
+            "value": 523
+        }
+    ],
+    "severity": [
+        {
+            "label": "Critical",
+            "value": 12432
+        },
+        {
+            "label": "High",
+            "value": 12535
+        },
+        {
+            "label": "Medium",
+            "value": 12405
+        },
+        {
+            "label": "Low",
+            "value": 12628
+        }
+    ],
+    "resolution": [
+        {
+            "label": "Fixed",
+            "value": 26592
+        },
+        {
+            "label": "Unresolved",
+            "value": 19402
+        },
+        {
+            "label": "Duplicate",
+            "value": 2002
+        },
+        {
+            "label": "Invalid",
+            "value": 1481
+        },
+        {
+            "label": "Won't Fix",
+            "value": 523
+        }
+    ],
+    "feature": [
+        {
+            "label": "Runtime Memory",
+            "value": 3220
+        },
+        {
+            "label": "Audit Logging",
+            "value": 3194
+        },
+        {
+            "label": "Environment Provisioning",
+            "value": 3181
+        },
+        {
+            "label": "User Interface",
+            "value": 3167
+        },
+        {
+            "label": "Release Rollout",
+            "value": 3153
+        },
+        {
+            "label": "Roles & Permissions",
+            "value": 3152
+        },
+        {
+            "label": "Public API",
+            "value": 3141
+        },
+        {
+            "label": "Job Scheduler",
+            "value": 3130
+        },
+        {
+            "label": "Health Monitoring",
+            "value": 3121
+        },
+        {
+            "label": "Threat Protection",
+            "value": 3121
+        },
+        {
+            "label": "Response Latency",
+            "value": 3100
+        },
+        {
+            "label": "Business Rules Engine",
+            "value": 3095
+        },
+        {
+            "label": "Login & SSO",
+            "value": 3083
+        },
+        {
+            "label": "Persistence Layer",
+            "value": 3082
+        },
+        {
+            "label": "Build & Release",
+            "value": 3075
+        },
+        {
+            "label": "Navigation & Routing",
+            "value": 2985
+        }
+    ],
+    "component": [
+        {
+            "label": "web-ui-angular",
+            "value": 3300
+        },
+        {
+            "label": "db-mongo",
+            "value": 3216
+        },
+        {
+            "label": "cloud-aws",
+            "value": 3152
+        },
+        {
+            "label": "cloud-azure",
+            "value": 3135
+        },
+        {
+            "label": "svc-django-app",
+            "value": 3122
+        },
+        {
+            "label": "infra-k8s",
+            "value": 3116
+        },
+        {
+            "label": "svc-spring-core",
+            "value": 3115
+        },
+        {
+            "label": "cloud-gcp",
+            "value": 3115
+        },
+        {
+            "label": "svc-node-api",
+            "value": 3112
+        },
+        {
+            "label": "db-mysql",
+            "value": 3109
+        },
+        {
+            "label": "svc-flask-api",
+            "value": 3100
+        },
+        {
+            "label": "web-ui-react",
+            "value": 3099
+        },
+        {
+            "label": "infra-docker",
+            "value": 3097
+        },
+        {
+            "label": "svc-laravel-web",
+            "value": 3086
+        },
+        {
+            "label": "db-postgres",
+            "value": 3076
+        },
+        {
+            "label": "web-ui-vue",
+            "value": 3050
+        }
+    ],
+    "insights": [
+        {
+            "title": "Concentrate hardening effort on Delivery Pipeline",
+            "detail": "Raw bug counts barely separate the modules, but size does: Delivery Pipeline packs 8,364 defects into only 31.7 KLOC \u2014 263.8 per KLOC, 4.4x the density of Core Services (59.5 per KLOC over 142.5 KLOC), with 6,044 still open. Per line of code touched, a refactor and test-coverage push there removes more defect mass than the same effort spread across all six modules."
+        },
+        {
+            "title": "P3 is the weakest link in the SLA",
+            "detail": "Only 70.8% of closed P3 bugs met their 14-day target (average 11.9 days, median 10.0). Overall SLA compliance is 77.6%. Either the P3 target is unrealistic for the work it covers, or triage is under-staffing that queue \u2014 re-baseline the target or reserve sprint capacity for it."
+        },
+        {
+            "title": "Clear the aged backlog before it becomes technical debt",
+            "detail": "33,528 of the 35,852 open bugs (93.5%) have already passed their SLA target, and the average open bug is 182.4 days old. Run an explicit aging sweep each sprint: close, defer with a reason, or escalate \u2014 bugs that age silently distort every downstream estimate."
+        },
+        {
+            "title": "Intake outruns closure \u2014 cap work-in-progress",
+            "detail": "The backlog grew in 26 of 26 sprints and ends at 35,852 open bugs. SPR-01 was the worst (1,989 opened vs 208 closed). Holding a fixed closure quota per sprint \u2014 rather than a fixed intake \u2014 is the only way this curve flattens."
+        },
+        {
+            "title": "Three root causes drive a third of all defects",
+            "detail": "'Misconfiguration or logic issue related to memory leak' alone accounts for 3,220 bugs (6.4%), and the top three causes together account for 19.2%. These are systemic, not incidental: a single guard rail (lint rule, contract test, review checklist) against each removes recurring work from every future sprint."
+        },
+        {
+            "title": "Release v2.2 carries the largest urgent queue",
+            "detail": "v2.2 still has 1,450 unresolved P1/P2 bugs, out of 4,133 open and 5,723 total. Closure rates sit near 27.8% across every release, so the differentiator is volume, not discipline. Gate the next release on the urgent queue being drained rather than on the calendar."
+        },
+        {
+            "title": "The routing policy concentrates a quarter of all work on one role",
+            "detail": "Backend Developer is routed 13,004 bugs (26.0% of everything) and is sitting on 3,145 open P1/P2, while Data Engineer receives 2,586. Turnaround is nearly identical across all 7 roles (15.7\u201317.2 days), so the queue length \u2014 not individual speed \u2014 is what delays urgent fixes. Re-route one or two bug categories, or add capacity where the policy points."
+        }
+    ]
+}
