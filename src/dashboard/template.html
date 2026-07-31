@@ -18,6 +18,7 @@
 
 <header class="page-head">
   <div>
+    <p class="eyebrow">Bug Management System</p>
     <h1>Bug Analytics Dashboard</h1>
     <p class="sub">__TOTAL__ bug records &middot; snapshot __SNAPSHOT__ &middot; generated __GENERATED__</p>
   </div>
@@ -29,88 +30,134 @@
 
 <section class="filters" aria-label="Dashboard filters">
   <div class="filter-grid" id="filter-grid"></div>
+  <div class="active-filters" id="active-filters"></div>
   <div class="filter-actions">
     <button type="button" id="reset-filters">Reset all filters</button>
-    <span class="hint">Click any bar or heatmap cell to filter by it.</span>
+    <span class="hint">Click any bar, wedge or heatmap cell to filter by it.</span>
+    <div class="save-view-form">
+      <input type="text" id="save-view-name" placeholder="Name this view&hellip;" maxlength="40" aria-label="Name this view">
+      <button type="button" id="save-view-btn">Save view</button>
+    </div>
   </div>
+  <div class="saved-views" id="saved-views-list" aria-label="Saved views"></div>
 </section>
 
 <section class="kpi-strip" id="kpi-strip" aria-label="Headline KPIs"></section>
 
-<main class="grid">
+<main class="dashboard-main">
 
-  <article class="card wide">
-    <h2>Sprint-wise intake, closure &amp; backlog</h2>
-    <p class="note">Bars are bugs opened and closed in each sprint; the line is the open backlog carried forward.</p>
-    <div class="chart" id="chart-sprint"></div>
-  </article>
+  <section class="dash-section">
+    <h2 class="section-title">Trends</h2>
+    <div class="grid">
 
-  <article class="card">
-    <h2>Bug status</h2>
-    <p class="note">Life cycle order, not frequency order.</p>
-    <div class="chart" id="chart-status"></div>
-  </article>
+      <article class="card wide">
+        <h2>Sprint-wise intake, closure &amp; backlog</h2>
+        <p class="note">Bars are bugs opened and closed in each sprint; the line is the open backlog carried forward.</p>
+        <div class="chart" id="chart-sprint"></div>
+      </article>
 
-  <article class="card">
-    <h2>Resolution outcome</h2>
-    <p class="note">How closed bugs ended, and what is still unresolved.</p>
-    <div class="chart" id="chart-resolution"></div>
-  </article>
+      <article class="card wide">
+        <h2>Bug reporting trend</h2>
+        <p class="note">New bugs reported per week (light band) with a 4-week rolling average (bold line) &mdash; is intake accelerating or easing?</p>
+        <div class="chart" id="chart-bugtrend"></div>
+      </article>
 
-  <article class="card">
-    <h2>Module-wise distribution</h2>
-    <p class="note">Which product area the defects land in.</p>
-    <div class="chart" id="chart-module"></div>
-  </article>
+      <article class="card wide">
+        <h2>Resolution time trend</h2>
+        <p class="note">Average days to close, by the sprint a bug was <em>reported</em> in, against the overall average for the current selection.</p>
+        <div class="chart" id="chart-restime-trend"></div>
+      </article>
 
-  <article class="card">
-    <h2>Priority distribution</h2>
-    <p class="note">P1 is the most urgent queue.</p>
-    <div class="chart" id="chart-priority"></div>
-  </article>
+    </div>
+  </section>
 
-  <article class="card">
-    <h2>Defect density by module</h2>
-    <p class="note">Bugs per KLOC — volume normalised by module size.</p>
-    <div class="chart" id="chart-density"></div>
-  </article>
+  <section class="dash-section">
+    <h2 class="section-title">Distribution &amp; quality</h2>
+    <div class="grid">
 
-  <article class="card">
-    <h2>Resolution time vs SLA</h2>
-    <p class="note">Average days to close per priority; the marker is the SLA target.</p>
-    <div class="chart" id="chart-restime"></div>
-  </article>
+      <article class="card">
+        <h2>Bug status</h2>
+        <p class="note">Life cycle order, not frequency order.</p>
+        <div class="chart" id="chart-status"></div>
+      </article>
 
-  <article class="card wide">
-    <h2>Module &times; Priority</h2>
-    <p class="note">Where the urgent work is concentrated.</p>
-    <div class="chart" id="chart-heatmap"></div>
-  </article>
+      <article class="card">
+        <h2>Resolution outcome</h2>
+        <p class="note">How closed bugs ended, and what is still unresolved.</p>
+        <div class="chart" id="chart-resolution"></div>
+      </article>
 
-  <article class="card">
-    <h2>Top root causes</h2>
-    <p class="note">Recurring causes are the cheapest defects to prevent.</p>
-    <div class="chart" id="chart-rootcause"></div>
-  </article>
+      <article class="card">
+        <h2>Module-wise distribution</h2>
+        <p class="note">Which product area the defects land in.</p>
+        <div class="chart" id="chart-module"></div>
+      </article>
 
-  <article class="card">
-    <h2>Top affected features</h2>
-    <p class="note">User-facing capability the defect breaks.</p>
-    <div class="chart" id="chart-feature"></div>
-  </article>
+      <article class="card">
+        <h2>Priority distribution</h2>
+        <p class="note">P1 is the most urgent queue.</p>
+        <div class="chart" id="chart-priority"></div>
+      </article>
 
-  <article class="card wide">
-    <h2>Release-wise quality</h2>
-    <div class="table-wrap"><table id="table-release"></table></div>
-  </article>
+      <article class="card">
+        <h2>Defect density by module</h2>
+        <p class="note">Bugs per KLOC &mdash; volume normalised by module size.</p>
+        <div class="chart" id="chart-density"></div>
+      </article>
 
-  <article class="card wide">
-    <h2>Team performance</h2>
-    <p class="note">Rows use the routing-policy owner (bug category &rarr; specialist). The source
-      dataset's own <code>developer_role</code> column is uniformly random, so it would show
-      nine identical rows.</p>
-    <div class="table-wrap"><table id="table-team"></table></div>
-  </article>
+      <article class="card">
+        <h2>Resolution time vs SLA</h2>
+        <p class="note">Average days to close per priority; the dashed marker is the SLA target.</p>
+        <div class="chart" id="chart-restime"></div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h2 class="section-title">Hotspots</h2>
+    <div class="grid">
+
+      <article class="card wide">
+        <h2>Module &times; Priority</h2>
+        <p class="note">Where the urgent work is concentrated.</p>
+        <div class="chart" id="chart-heatmap"></div>
+      </article>
+
+      <article class="card">
+        <h2>Top root causes</h2>
+        <p class="note">Recurring causes are the cheapest defects to prevent.</p>
+        <div class="chart" id="chart-rootcause"></div>
+      </article>
+
+      <article class="card">
+        <h2>Top affected features</h2>
+        <p class="note">User-facing capability the defect breaks.</p>
+        <div class="chart" id="chart-feature"></div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h2 class="section-title">Release &amp; team</h2>
+    <div class="grid">
+
+      <article class="card wide">
+        <h2>Release-wise quality</h2>
+        <div class="table-wrap"><table id="table-release"></table></div>
+      </article>
+
+      <article class="card wide">
+        <h2>Team performance</h2>
+        <p class="note">Rows use the routing-policy owner (bug category &rarr; specialist). The source
+          dataset's own <code>developer_role</code> column is uniformly random, so it would show
+          nine identical rows.</p>
+        <div class="table-wrap"><table id="table-team"></table></div>
+      </article>
+
+    </div>
+  </section>
 
 </main>
 
@@ -123,7 +170,8 @@
 <footer class="page-foot">
   <p>Bug Management System &middot; Task 9 &mdash; interactive dashboards, KPI reporting and
      actionable insights. Sprint, release, module, feature, component and closure dates are
-     derived fields; see the project README under &ldquo;Derived Fields&rdquo;.</p>
+     derived fields; see the project README under &ldquo;Derived Fields&rdquo;. Filters and saved
+     views are stored only in this browser (<code>localStorage</code>) &mdash; nothing leaves the page.</p>
 </footer>
 
 <script id="payload" type="application/json">"__PAYLOAD__"</script>

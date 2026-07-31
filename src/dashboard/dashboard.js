@@ -63,9 +63,11 @@ for (var j = 0; j < N; j++) releaseCodes[j] = releaseSeen[releaseLabel(sprintCod
 
 /* Day index of the snapshot, used to age the bugs that are still open. */
 var snapshotDay = 0;
+var maxCreatedDay = 0;
 for (var k = 0; k < N; k++) {
   var end = created[k] + (days[k] === NULL2 ? 0 : days[k]);
   if (end > snapshotDay) snapshotDay = end;
+  if (created[k] > maxCreatedDay) maxCreatedDay = created[k];
 }
 
 /* ── Dimensions ──────────────────────────────────────────────────────────── */
@@ -543,6 +545,168 @@ function drawHeatmap(el, rows) {
   el.innerHTML = out.join('');
 }
 
+/* ── Line / trend charts ─────────────────────────────────────────────────── *
+ * Shared by the weekly bug-reporting trend and the sprint-over-sprint
+ * resolution-time trend. Series may contain nulls (a sprint with nothing
+ * closed yet) — those are rendered as gaps rather than dragging the line to
+ * zero. */
+var MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function weekLabel(originParts, weekIndex) {
+  var d = new Date(originParts[0], originParts[1] - 1, originParts[2]);
+  d.setDate(d.getDate() + weekIndex * 7);
+  return MONTH_ABBR[d.getMonth()] + ' ' + d.getDate();
+}
+
+function rollingAvg(arr, window) {
+  var out = new Array(arr.length);
+  for (var i = 0; i < arr.length; i++) {
+    var lo = Math.max(0, i - window + 1), sum = 0, cnt = 0;
+    for (var j = lo; j <= i; j++) { sum += arr[j]; cnt++; }
+    out[i] = cnt ? sum / cnt : null;
+  }
+  return out;
+}
+
+function drawLineChart(el, categories, series, opts) {
+  opts = opts || {};
+  if (!categories.length) { empty(el); return; }
+
+  var W = opts.width || 1100;
+  var doRotate = opts.rotate != null ? opts.rotate : categories.length > 10;
+  var H = opts.height || 280;
+  var left = 54, right = 20, top = 18, bottom = doRotate ? 56 : 34;
+  var chartW = W - left - right, chartH = H - top - bottom;
+
+  var allVals = [];
+  series.forEach(function (s) {
+    s.values.forEach(function (v) { if (v != null && isFinite(v)) allVals.push(v); });
+  });
+  var max = allVals.length ? Math.max.apply(null, allVals) : 1;
+  var ticks = niceTicks(max, 4);
+  var scaleMax = ticks[ticks.length - 1] || max || 1;
+
+  var n = categories.length;
+  var stepX = n > 1 ? chartW / (n - 1) : 0;
+  function xAt(i) { return left + (n > 1 ? i * stepX : chartW / 2); }
+  function yAt(v) { return top + chartH - (v / scaleMax) * chartH; }
+
+  var out = [svgOpen(W, H)];
+  ticks.forEach(function (t) {
+    var y = yAt(t);
+    out.push('<line class="grid-line" x1="' + left + '" y1="' + y + '" x2="' + (W - right) +
+             '" y2="' + y + '"/>',
+             '<text class="tick-text" x="' + (left - 7) + '" y="' + (y + 4) +
+             '" text-anchor="end">' + esc(opts.yTickFormat ? opts.yTickFormat(t) : fmt(t)) +
+             '</text>');
+  });
+
+  var everyLabel = opts.labelEvery || Math.max(1, Math.ceil(n / (doRotate ? 18 : 10)));
+  categories.forEach(function (label, i) {
+    if (i % everyLabel !== 0 && i !== n - 1) return;
+    var x = xAt(i);
+    if (doRotate) {
+      out.push('<text class="tick-text" transform="translate(' + x + ',' + (top + chartH + 12) +
+               ') rotate(-42)" text-anchor="end">' + esc(label) + '</text>');
+    } else {
+      out.push('<text class="tick-text" x="' + x + '" y="' + (top + chartH + 16) +
+               '" text-anchor="middle">' + esc(label) + '</text>');
+    }
+  });
+
+  series.forEach(function (s) {
+    var segments = [], current = [];
+    for (var i = 0; i < n; i++) {
+      var v = s.values[i];
+      if (v == null || !isFinite(v)) {
+        if (current.length) { segments.push(current); current = []; }
+        continue;
+      }
+      current.push([xAt(i), yAt(v), i, v]);
+    }
+    if (current.length) segments.push(current);
+
+    segments.forEach(function (seg) {
+      var linePts = seg.map(function (p) { return p[0] + ',' + p[1]; }).join(' ');
+      if (s.area) {
+        var baseline = yAt(0);
+        var areaPts = linePts + ' ' + seg[seg.length - 1][0] + ',' + baseline +
+                      ' ' + seg[0][0] + ',' + baseline;
+        out.push('<polygon points="' + areaPts + '" fill="' + s.color + '" opacity="0.16"/>');
+      }
+      out.push('<polyline points="' + linePts + '" fill="none" stroke="' + s.color +
+               '" stroke-width="' + (s.thick ? 2.6 : 2) + '" stroke-linejoin="round" ' +
+               'stroke-linecap="round"' + (s.dashed ? ' stroke-dasharray="6 4"' : '') + '/>');
+      if (!s.dashed) {
+        seg.forEach(function (p) {
+          out.push('<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.6" fill="' + s.color +
+                   '"><title>' + esc(categories[p[2]] + ' — ' + s.label + ': ' + fmt1(p[3]) +
+                   (opts.tipUnit ? ' ' + opts.tipUnit : '')) + '</title></circle>');
+        });
+      }
+    });
+  });
+
+  out.push('<line class="axis-line" x1="' + left + '" y1="' + (top + chartH) + '" x2="' +
+           (W - right) + '" y2="' + (top + chartH) + '"/>');
+  if (series.length > 1) {
+    out.push(legendMarkup(series.map(function (s) {
+      return { label: s.label, color: s.color };
+    }), left, H - 8));
+  }
+  out.push('</svg>');
+  el.innerHTML = out.join('');
+}
+
+function renderBugTrend(rows) {
+  var el = document.getElementById('chart-bugtrend');
+  if (!rows.length) { empty(el); return; }
+  var maxWeek = Math.floor(maxCreatedDay / 7);
+  var counts = new Array(maxWeek + 1).fill(0);
+  for (var i = 0; i < rows.length; i++) counts[Math.floor(created[rows[i]] / 7)]++;
+
+  var originParts = P.origin.split('-').map(Number);
+  var categories = counts.map(function (_, w) { return weekLabel(originParts, w); });
+  var avg = rollingAvg(counts, 4);
+
+  drawLineChart(el, categories, [
+    { label: 'New bugs / week', color: '#5a7fb8', values: counts, area: true },
+    { label: '4-week average', color: '#1565c0', values: avg, thick: true }
+  ], { height: 260, yTickFormat: fmt, tipUnit: 'bugs' });
+}
+
+function renderResolutionTrend(rows) {
+  var el = document.getElementById('chart-restime-trend');
+  if (!rows.length) { empty(el); return; }
+  var sums = new Array(sprintLabels.length).fill(0);
+  var cnts = new Array(sprintLabels.length).fill(0);
+  var overallSum = 0, overallCnt = 0;
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (days[r] === NULL2) continue;
+    var s = sprintCodes[r];
+    sums[s] += days[r];
+    cnts[s]++;
+    overallSum += days[r];
+    overallCnt++;
+  }
+
+  var values = sums.map(function (sum, idx) { return cnts[idx] ? sum / cnts[idx] : null; });
+  var series = [{ label: 'Avg resolution days', color: '#7b1fa2', values: values, thick: true }];
+  if (overallCnt) {
+    var overallAvg = overallSum / overallCnt;
+    series.push({
+      label: 'Overall average (' + fmt1(overallAvg) + 'd)', color: '#8b93a5',
+      values: sprintLabels.map(function () { return overallAvg; }), dashed: true
+    });
+  }
+
+  drawLineChart(el, sprintLabels, series, {
+    height: 260, rotate: true, yTickFormat: function (t) { return fmt(t) + 'd'; }, tipUnit: 'days'
+  });
+}
+
 /* ── Tables ──────────────────────────────────────────────────────────────── */
 function renderTable(el, headers, rows) {
   if (!rows.length) { el.innerHTML = '<tbody><tr><td class="empty">No bugs match the ' +
@@ -776,6 +940,93 @@ function renderTeamTable(rows) {
      'Close rate', 'SLA met'], body);
 }
 
+/* ── Persistence: filters auto-remembered, views saved by name ──────────────
+ * Both live only in this browser's localStorage — nothing is sent anywhere.
+ * Reads/writes are wrapped in try/catch since storage can throw (private
+ * browsing, disabled cookies, a full quota) and none of that should break
+ * the dashboard itself. */
+var FILTERS_KEY = 'bugDashboard.filters.v1';
+var VIEWS_KEY   = 'bugDashboard.savedViews.v1';
+
+function loadStoredFilters() {
+  try {
+    var raw = localStorage.getItem(FILTERS_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    var out = {};
+    FILTER_KEYS.forEach(function (key) {
+      var v = obj[key];
+      out[key] = (typeof v === 'number' && v >= -1 && v < DIM[key].labels.length) ? v : -1;
+    });
+    return out;
+  } catch (e) { return null; }
+}
+
+function persistFilters() {
+  try { localStorage.setItem(FILTERS_KEY, JSON.stringify(state.filters)); } catch (e) {}
+}
+
+function loadSavedViews() {
+  try {
+    var arr = JSON.parse(localStorage.getItem(VIEWS_KEY) || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function persistSavedViews(views) {
+  try { localStorage.setItem(VIEWS_KEY, JSON.stringify(views)); } catch (e) {}
+}
+
+function saveCurrentView(name) {
+  name = (name || '').trim();
+  if (!name) return;
+  var views = loadSavedViews().filter(function (v) { return v.name !== name; });
+  views.push({ name: name, filters: state.filters });
+  persistSavedViews(views);
+  renderSavedViews();
+}
+
+function deleteSavedView(name) {
+  persistSavedViews(loadSavedViews().filter(function (v) { return v.name !== name; }));
+  renderSavedViews();
+}
+
+function applyFilterSet(filters) {
+  FILTER_KEYS.forEach(function (key) {
+    var v = filters[key];
+    state.filters[key] = (typeof v === 'number' && v >= -1 && v < DIM[key].labels.length) ? v : -1;
+  });
+  persistFilters();
+  syncFilterUI();
+  renderActiveFilters();
+  refresh();
+}
+
+function renderSavedViews() {
+  var el = document.getElementById('saved-views-list');
+  var views = loadSavedViews();
+  if (!views.length) { el.innerHTML = ''; return; }
+  el.innerHTML = views.map(function (v, i) {
+    return '<span class="view-chip">' +
+      '<button type="button" class="view-chip-apply" data-view-index="' + i + '">' +
+        esc(clip(v.name, 28)) + '</button>' +
+      '<button type="button" class="view-chip-del" data-view-name="' + esc(v.name) +
+        '" aria-label="Delete saved view ' + esc(v.name) + '">&times;</button></span>';
+  }).join('');
+}
+
+function renderActiveFilters() {
+  var el = document.getElementById('active-filters');
+  var active = FILTER_KEYS.filter(function (key) { return state.filters[key] >= 0; });
+  if (!active.length) { el.innerHTML = ''; return; }
+  el.innerHTML = active.map(function (key) {
+    var dim = DIM[key], label = dim.labels[state.filters[key]];
+    return '<span class="filter-chip">' + esc(dim.label) + ': ' + esc(clip(label, 24)) +
+      '<button type="button" class="chip-remove" data-key="' + key +
+      '" aria-label="Remove ' + esc(dim.label) + ' filter">&times;</button></span>';
+  }).join('');
+}
+
 /* ── Filter UI ───────────────────────────────────────────────────────────── */
 function buildFilterUI() {
   var grid = document.getElementById('filter-grid');
@@ -794,22 +1045,61 @@ function buildFilterUI() {
     var select = event.target.closest('select');
     if (!select) return;
     state.filters[select.dataset.key] = parseInt(select.value, 10);
+    persistFilters();
+    syncFilterUI();
+    renderActiveFilters();
     refresh();
   });
 
   document.getElementById('reset-filters').addEventListener('click', function () {
     FILTER_KEYS.forEach(function (key) { state.filters[key] = -1; });
+    persistFilters();
     syncFilterUI();
+    renderActiveFilters();
     refresh();
   });
 
+  document.getElementById('active-filters').addEventListener('click', function (event) {
+    var btn = event.target.closest('.chip-remove');
+    if (!btn) return;
+    state.filters[btn.dataset.key] = -1;
+    persistFilters();
+    syncFilterUI();
+    renderActiveFilters();
+    refresh();
+  });
+
+  document.getElementById('save-view-btn').addEventListener('click', function () {
+    var input = document.getElementById('save-view-name');
+    saveCurrentView(input.value);
+    input.value = '';
+  });
+  document.getElementById('save-view-name').addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    saveCurrentView(this.value);
+    this.value = '';
+  });
+  document.getElementById('saved-views-list').addEventListener('click', function (event) {
+    var apply = event.target.closest('.view-chip-apply');
+    if (apply) {
+      var views = loadSavedViews();
+      var view = views[parseInt(apply.dataset.viewIndex, 10)];
+      if (view) applyFilterSet(view.filters);
+      return;
+    }
+    var del = event.target.closest('.view-chip-del');
+    if (del) deleteSavedView(del.dataset.viewName);
+  });
+
   /* Clicking a bar, wedge or cell drills into that value. */
-  document.querySelector('main.grid').addEventListener('click', function (event) {
+  document.querySelector('main.dashboard-main').addEventListener('click', function (event) {
     var target = event.target.closest('[data-dim]');
     if (!target) return;
     var key = target.dataset.dim, code = parseInt(target.dataset.code, 10);
     state.filters[key] = (state.filters[key] === code) ? -1 : code;
+    persistFilters();
     syncFilterUI();
+    renderActiveFilters();
     refresh();
   });
 }
@@ -835,6 +1125,8 @@ function refresh() {
   var rows = state.rows;
   renderKpis(rows);
   drawSprintChart(document.getElementById('chart-sprint'), rows);
+  renderBugTrend(rows);
+  renderResolutionTrend(rows);
   renderStatus(rows);
   renderResolution(rows);
   renderModule(rows);
@@ -848,7 +1140,13 @@ function refresh() {
   renderTeamTable(rows);
 }
 
+var restoredFilters = loadStoredFilters();
+if (restoredFilters) state.filters = restoredFilters;
+
 buildFilterUI();
+syncFilterUI();
+renderActiveFilters();
+renderSavedViews();
 renderInsights();
 refresh();
 
