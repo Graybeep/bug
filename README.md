@@ -43,7 +43,8 @@ BugManagement/
 │   ├── tracked_bugs.json              # Live ticket tracker (created by 07)
 │   └── model_evaluation_results.json  # ML model metrics
 ├── dashboards/
-│   └── bug_analytics_dashboard.html   # Interactive dashboard (created by 08, offline)
+│   ├── ops_dashboard.html             # Triage & Ops report — for managers/leads (created by 08, offline)
+│   └── model_report.html              # Model Report — for data-science reviewers (created by 08, offline)
 ├── models/
 │   ├── label_encoders.pkl             # Fitted label encoders
 │   ├── tfidf_vectorizer.pkl           # TF-IDF vectorizer
@@ -60,11 +61,12 @@ BugManagement/
 │   ├── 05_modeling.py                 # Task 6: Train & evaluate 5 ML models per target
 │   ├── 06_predict.py                  # Task 7: Predict severity & priority
 │   ├── 07_bug_triage.py               # Task 8: Full triage — assign, diagnose, track
-│   ├── 08_dashboard.py                # Task 9: Interactive dashboard + KPI report
+│   ├── 08_dashboard.py                # Task 9: Triage & Ops + Model reports, KPI report
 │   ├── dashboard/                     # Front-end assets inlined into the HTML by 08
-│   │   ├── template.html              #   page structure
-│   │   ├── dashboard.css              #   layout & theming (light + dark)
-│   │   └── dashboard.js               #   decoding, filtering, SVG charts
+│   │   ├── ops_template.html          #   Triage & Ops page structure
+│   │   ├── model_template.html        #   Model Report page structure
+│   │   ├── theme.css                  #   shared layout & theming (light + dark)
+│   │   └── interactions.js            #   table sort (the only client-side behaviour)
 │   ├── _deps.py                       # Dependency guard (clear message if venv not active)
 │   └── present_dataset.py             # Optional: rich console summary of the dataset
 ├── visualizations/
@@ -190,7 +192,7 @@ python src/08_dashboard.py              # add --no-open to only build it
 | 6 | Model Training & Testing | `05_modeling.py` | 5 models × 3 targets, best saved |
 | 7 | Severity & Priority Prediction | `06_predict.py` | Console prediction output |
 | 8 | End-to-End Triage & Tracking | `07_bug_triage.py` | `data/tracked_bugs.json`, lifecycle chart |
-| 9 | Interactive Dashboards & KPI Reporting | `08_dashboard.py` | `dashboards/bug_analytics_dashboard.html`, `data/kpi_report.json`, 5 KPI charts |
+| 9 | Dashboards & KPI Reporting | `08_dashboard.py` | `dashboards/ops_dashboard.html`, `dashboards/model_report.html`, `data/kpi_report.json`, 5 KPI charts |
 
 ---
 
@@ -363,36 +365,44 @@ All charts are saved to the `visualizations/` folder **and opened in your defaul
 
 ---
 
-## 📊 Interactive Dashboard & KPI Reporting (`08_dashboard.py`)
+## 📊 Dashboards & KPI Reporting (`08_dashboard.py`)
 
-Stage 9 turns the bug records into an **interactive dashboard** plus a **KPI report** and a set of **actionable insights**.
+Stage 9 turns the bug records into two audience-specific reports plus a **KPI report** and a set of **actionable insights**. Each report is a single self-contained HTML file — no server, no CDN, no network access. Open either by double-clicking.
 
 ```bash
-python src/08_dashboard.py                # build the dashboard and open it
+python src/08_dashboard.py                # build both reports and open the Triage & Ops one
 python src/08_dashboard.py --no-open      # build only
 python src/08_dashboard.py --top 15       # widen the "top N root causes" table
 ```
 
-### The dashboard
+### `dashboards/ops_dashboard.html` — Triage & Ops
 
-`dashboards/bug_analytics_dashboard.html` is a **single self-contained file** — no server, no CDN, no network access. Open it by double-clicking. It embeds all 50,000 records as character-encoded columns (≈0.7 MB) and redraws every chart in the browser whenever a filter changes, so the KPI strip and all twelve panels always describe one consistent selection.
+For engineering managers and triage leads: a ranked read of what needs attention now, not a wall of charts.
 
-**Filter on any of 12 dimensions** — Release version, Sprint, Module, Feature, Component, Priority, Severity, Status, Resolution, Root cause, Team, Environment. Filters combine, and **clicking any bar, donut wedge or heatmap cell** applies that value as a filter (click again to clear it).
+| Section | Shows |
+|---------|-------|
+| Stat tiles | Open bugs, SLA compliance, avg resolution time, defect density, reopen rate, backlog trend — each color-coded by status |
+| Needs attention now | The 7 data-driven insights (module hotspot, weakest SLA queue, aged backlog, backlog growth, recurring root causes, riskiest release, routing concentration), ranked and numbered |
+| Sprint burn | Opened vs closed per sprint with the carried-over backlog, one shared axis (all three are bug counts) |
+| Module hotspots | Ranked by defect density (bugs per KLOC), sortable |
+| Team workload | Ranked by routed load, per the routing-policy owner — the dataset's own `developer_role` is uniformly random, see *Known Data Limitations* |
+| Release risk | Ranked by open P1/P2 count |
+| Priority vs SLA | Average/median days to close against each priority's target, with a status badge |
+| Recurring root causes | Top 5 by volume |
 
-| Panel | Shows |
-|-------|-------|
-| KPI strip | Bugs in scope, closed, still open, avg days to close, SLA compliance, open past SLA, defect density, reopen rate |
-| Sprint-wise intake, closure & backlog | Opened vs closed bars per sprint with the carried-over backlog line |
-| Bug status | All 11 workflow states in life cycle order |
-| Resolution outcome | Donut of Fixed / Unresolved / Duplicate / Invalid / Won't Fix |
-| Module-wise distribution | Bug volume per product module |
-| Priority distribution | P1–P5 volume |
-| Defect density by module | Bugs per KLOC |
-| Resolution time vs SLA | Average days to close per priority, with the SLA target marked |
-| Module × Priority | Heatmap of where urgent work concentrates |
-| Top root causes / Top affected features | Ranked bars, with average days-to-close on hover |
-| Release-wise quality | Bugs, closed, open, P1/P2, avg days, close rate per release |
-| Team performance | Assigned, closed, open, open P1/P2, avg days, close rate, SLA met per owning role |
+Every table header is click-to-sort.
+
+### `dashboards/model_report.html` — Model Report
+
+For data-science reviewers: what's actually learnable from this data, not just an accuracy leaderboard. Each of the 3 prediction targets gets a verdict badge, a model-comparison bar chart (5 classifiers, consistently colored across both reports' charts), and a narrative computed from the live metrics:
+
+| Target | Verdict |
+|--------|---------|
+| Bug Category | **Leakage, not a result** — `title`/`description` are 16 boilerplate templates, so accuracy is ~100% for the wrong reason |
+| Severity | **No predictive signal** — every model sits at chance level (~25% for 4 classes); severity is independent of every feature tested |
+| Priority | **Learnable — with a caveat** — Random Forest genuinely separates from the rest, but priority is a derived field, so the model is recovering the scoring rule, not real-world triage priority |
+
+A full model × target comparison table follows, matching the summary table below.
 
 ### KPIs computed
 
