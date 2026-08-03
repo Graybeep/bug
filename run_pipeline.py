@@ -29,7 +29,7 @@ STAGES = [
     ('6',     'Training and Testing Models',          'src/05_modeling.py'),
     ('7',     'Severity & Priority Prediction',       'src/06_predict.py'),
     ('8',     'End-to-End Bug Triage & Tracking',     'src/07_bug_triage.py'),
-    ('9',     'Interactive Dashboards & KPI Reports', 'src/08_dashboard.py'),
+    ('9',     'Interactive Dashboard & KPI Reports',  'src/08_dashboard.py'),
 ]
 
 
@@ -102,12 +102,16 @@ def main():
         print(f"    [DONE] {name}")
     print(f"\n  Total runtime : {time.time() - overall:.1f}s")
     print(f"  Charts        : visualizations/")
-    print(f"  Dashboards    : dashboards/ops_dashboard.html")
-    print(f"                  dashboards/model_report.html")
+    print(f"  Dashboard     : dashboards/index.html")
     print(f"  Models        : models/")
     print(f"  Results       : data/model_evaluation_results.json")
     print(f"                  data/lifecycle_analysis.json")
     print(f"                  data/kpi_report.json")
+    print(f"\n  Live triage   : python src/09_serve.py")
+    print(f"                  serves the same dashboard with the trained models")
+    print(f"                  behind a local API, so the triage console predicts")
+    print(f"                  with best_priority_model.pkl instead of the")
+    print(f"                  documented fallback rule.")
     print("=" * 70)
     return 0
 

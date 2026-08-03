@@ -1,5 +1,5 @@
 {
-    "generated_at": "2026-07-31 21:39:53",
+    "generated_at": "2026-08-03 17:31:50",
     "headline": {
         "total_bugs": 50000,
         "closed_bugs": 14148,
@@ -205,6 +205,73 @@
             "closed": 1202,
             "backlog": 35852,
             "avg_days": 3.6
+        }
+    ],
+    "by_month": [
+        {
+            "month": "2025-02",
+            "opened": 3738,
+            "closed": 573
+        },
+        {
+            "month": "2025-03",
+            "opened": 4168,
+            "closed": 1063
+        },
+        {
+            "month": "2025-04",
+            "opened": 4099,
+            "closed": 1125
+        },
+        {
+            "month": "2025-05",
+            "opened": 4174,
+            "closed": 1155
+        },
+        {
+            "month": "2025-06",
+            "opened": 4094,
+            "closed": 1144
+        },
+        {
+            "month": "2025-07",
+            "opened": 4293,
+            "closed": 1130
+        },
+        {
+            "month": "2025-08",
+            "opened": 4273,
+            "closed": 1240
+        },
+        {
+            "month": "2025-09",
+            "opened": 4125,
+            "closed": 1101
+        },
+        {
+            "month": "2025-10",
+            "opened": 4135,
+            "closed": 1223
+        },
+        {
+            "month": "2025-11",
+            "opened": 4120,
+            "closed": 1159
+        },
+        {
+            "month": "2025-12",
+            "opened": 4207,
+            "closed": 1252
+        },
+        {
+            "month": "2026-01",
+            "opened": 4304,
+            "closed": 1709
+        },
+        {
+            "month": "2026-02",
+            "opened": 270,
+            "closed": 274
         }
     ],
     "by_module": [

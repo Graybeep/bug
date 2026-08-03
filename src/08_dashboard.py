@@ -1,26 +1,39 @@
 # ==============================================================================
 # 08_dashboard.py
-# Task 9: Dashboards, KPI Reporting & Actionable Insights
-# Builds two self-contained, server-rendered reports over the bug records:
-# a Triage & Ops report (what needs attention now) and a Model Report (what's
-# actually learnable from this data), keyed on Bug ID, Sprint, Release Version,
-# Module, Feature, Component, Priority, Resolution, Root Cause and Date Closed.
+# Task 9: Interactive Dashboard, KPI Reporting & Actionable Insights
 #
-#   python src/08_dashboard.py              # build + open the Triage & Ops report
+# Builds ONE self-contained interactive dashboard over the bug records, keyed on
+# Bug ID, Sprint, Release Version, Module, Feature, Component, Priority,
+# Resolution, Root Cause and Date Closed — plus bug trends and resolution time.
+#
+# The whole bug table is embedded in the page as base64 typed arrays (one byte
+# per categorical value), so every filter, chart, KPI and table recomputes in
+# the browser from the same slice. No server and no CDN are needed to read it.
+#
+# The trained models are wired in twice:
+#   - at build time, model_bridge re-scores every bug with the saved priority
+#     model, and reproduces 05_modeling.py's train/test split so the dashboard
+#     can separate held-out agreement from memorised rows;
+#   - at run time, src/09_serve.py exposes the same models over a local API so
+#     the dashboard's triage console does live inference.
+#
+#   python src/08_dashboard.py              # build + open it
 #   python src/08_dashboard.py --no-open    # build only
-#   python src/08_dashboard.py --top 15     # widen the "top N" chart cut-offs
+#   python src/08_dashboard.py --no-model   # skip model scoring (faster)
+#   python src/08_dashboard.py --sample 20000   # embed fewer rows (smaller file)
+#   python src/08_dashboard.py --top 15     # widen the console "top N" tables
 #
 # Input:  data/bug_reports_processed.csv  |  data/module_catalog.json
 #         data/bug_knowledge_base.json    |  data/model_evaluation_results.json
-# Output: dashboards/ops_dashboard.html   (Triage & Ops, offline)
-#         dashboards/model_report.html    (Model Report, offline)
+#         models/*.pkl                    (optional — for prediction columns)
+# Output: dashboards/index.html           (the interactive dashboard, offline)
 #         data/kpi_report.json            (machine-readable KPIs)
 #         visualizations/kpi_*.png        (static companions)
-#         + KPI report and actionable insights on the console
+#         + the KPI report and actionable insights on the console
 # ==============================================================================
 
 import argparse
-import html
+import base64
 import json
 import os
 import sys
@@ -28,7 +41,7 @@ import webbrowser
 from datetime import datetime
 
 import _deps
-_deps.check('pandas', 'numpy', 'matplotlib', 'seaborn')
+_deps.check('pandas', 'numpy', 'matplotlib', 'seaborn', 'sklearn', 'joblib')
 
 import pandas as pd
 import numpy as np
@@ -47,33 +60,39 @@ if sys.platform == "win32":
 # before the chdir so the dashboard assets stay locatable afterwards.
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.dirname(SRC_DIR))
+sys.path.insert(0, SRC_DIR)
+
+import model_bridge
 
 PROCESSED_PATH  = 'data/bug_reports_processed.csv'
 CATALOG_PATH    = 'data/module_catalog.json'
 KB_PATH         = 'data/bug_knowledge_base.json'
 MODEL_EVAL_PATH = 'data/model_evaluation_results.json'
 KPI_PATH        = 'data/kpi_report.json'
-OPS_PATH        = 'dashboards/ops_dashboard.html'
-MODEL_PATH      = 'dashboards/model_report.html'
+DASHBOARD_PATH  = 'dashboards/index.html'
+
+# Superseded by the single interactive dashboard; removed on build so a stale
+# copy can't be opened by mistake from an old bookmark.
+LEGACY_PAGES = ['dashboards/ops_dashboard.html', 'dashboards/model_report.html']
 
 # Fixed model -> categorical color slot, so a model keeps its identity across
-# every chart on the Model Report rather than being recolored per target.
+# every chart rather than being recolored per target.
 MODEL_ORDER = ['Naive Bayes', 'Logistic Regression', 'Decision Tree',
                'Random Forest', 'SVM (Linear)']
-MODEL_SLOT  = {name: i + 1 for i, name in enumerate(MODEL_ORDER)}
 
 # Mirrors 01_data_collection.py — kept here so the KPI stage can be re-run
 # against an older enriched CSV without silently changing the definitions.
 SPRINT_LENGTH_DAYS = 14
-CLOSED_STATUSES    = {'Closed', 'Duplicate', 'Rejected', 'Deferred'}
-OPEN_STATUSES      = {'New', 'Assigned', 'In Progress', 'Reopened'}
 DEFAULT_SLA_DAYS   = {'P1': 3, 'P2': 7, 'P3': 14, 'P4': 30, 'P5': 60}
 DOMAIN_OVERRIDE    = {'Mobile': 'Mobile Developer'}
 
-PRIORITY_ORDER = ['P1', 'P2', 'P3', 'P4', 'P5']
-SEVERITY_ORDER = ['Critical', 'High', 'Medium', 'Low']
-STATUS_ORDER   = ['New', 'Assigned', 'In Progress', 'Fixed', 'Pending Retest',
-                  'Verified', 'Closed', 'Reopened', 'Duplicate', 'Rejected', 'Deferred']
+PRIORITY_ORDER   = ['P1', 'P2', 'P3', 'P4', 'P5']
+SEVERITY_ORDER   = ['Critical', 'High', 'Medium', 'Low']
+STATUS_ORDER     = ['New', 'Assigned', 'In Progress', 'Fixed', 'Pending Retest',
+                    'Verified', 'Closed', 'Reopened', 'Duplicate', 'Rejected', 'Deferred']
+LIFECYCLE_ORDER  = ['Reported', 'In Progress', 'Resolved', 'Verification', 'Closed']
+RESOLUTION_ORDER = ['Fixed', 'Unresolved', 'Duplicate', 'Invalid', "Won't Fix"]
+ENVIRONMENT_ORDER = ['Development', 'Staging', 'Production']
 
 RULE = "-" * 68
 
@@ -118,7 +137,7 @@ def load_inputs():
             model_eval = json.load(f)
     else:
         print(f"  [WARN] '{MODEL_EVAL_PATH}' not found — run 'python src/05_modeling.py' "
-              f"first; the Model Report will be skipped.")
+              f"first; the model verdicts will be skipped.")
 
     return df, catalog, kb, model_eval
 
@@ -147,6 +166,9 @@ def prepare(df, kb):
     # Age of a still-open bug, measured to the snapshot date.
     df['open_age_days'] = np.where(
         df['is_open'], (snapshot - df['created_at']).dt.days, np.nan)
+
+    df['month']       = df['created_at'].dt.strftime('%Y-%m')
+    df['close_month'] = df['date_closed'].dt.strftime('%Y-%m')
 
     # The dataset's own `developer_role` is uniformly random across categories
     # (see README "Known Data Limitations"), so team KPIs are reported against
@@ -178,6 +200,12 @@ def module_kloc(catalog, df):
     for name in df['module'].dropna().unique():
         sizes.setdefault(str(name), 1.0)
     return sizes
+
+
+def max_sprint_index(df):
+    """Highest 0-based sprint index present in the 'SPR-nn' labels."""
+    numbers = df['sprint'].astype(str).str.extract(r'(\d+)')[0].dropna().astype(int)
+    return int(numbers.max()) - 1 if len(numbers) else 0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -322,6 +350,13 @@ def compute_kpis(df, catalog, snapshot):
         })
     by_team.sort(key=lambda r: -r['assigned'])
 
+    # ── Monthly trend (bug reporting vs closure over time) ────────────────────
+    months = sorted(set(df['month'].dropna()) | set(df['close_month'].dropna()))
+    opened_m = df.groupby('month').size().reindex(months, fill_value=0)
+    closed_m = closed.groupby('close_month').size().reindex(months, fill_value=0)
+    by_month = [{'month': m, 'opened': int(opened_m[m]), 'closed': int(closed_m[m])}
+                for m in months]
+
     # ── Simple distributions ─────────────────────────────────────────────────
     def distribution(column, preferred=None):
         counts = df[column].value_counts()
@@ -334,6 +369,7 @@ def compute_kpis(df, catalog, snapshot):
         'headline':      headline,
         'sla_targets':   targets,
         'by_sprint':     by_sprint,
+        'by_month':      by_month,
         'by_module':     by_module,
         'by_release':    by_release,
         'by_priority':   by_priority,
@@ -549,7 +585,305 @@ def wrap(text, width):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Static companion charts
+#  Model scoring — the build-time half of the model pipeline
+# ──────────────────────────────────────────────────────────────────────────────
+def score_with_models(df):
+    """Re-score every bug with the saved priority model, and recover which rows
+    05_modeling.py trained on. Returns None when the models aren't available —
+    the dashboard degrades to its non-model views rather than failing."""
+    bundle = model_bridge.load(quiet=True)
+    if not bundle.ready:
+        for err in bundle.errors:
+            print(f"    [SKIP] {err}")
+        return None
+
+    print(f"    Model        : {type(bundle.priority_model).__name__} "
+          f"(models/best_priority_model.pkl)")
+
+    def progress(done, total):
+        pct = done / total * 100
+        print(f"\r    Scoring      : {done:,}/{total:,} rows ({pct:.0f}%)", end='', flush=True)
+
+    try:
+        labels, conf = model_bridge.score_dataset(bundle, df, progress=progress)
+    except Exception as exc:                                       # noqa: BLE001
+        print(f"\r    [SKIP] Scoring failed: {exc.__class__.__name__}: {exc}")
+        return None
+    print()
+
+    split = model_bridge.training_split(df)
+    n_train = int((split == 1).sum())
+    n_test  = int((split == 2).sum())
+    print(f"    Split recall : {n_train:,} training rows, {n_test:,} held-out test rows, "
+          f"{len(df) - n_train - n_test:,} never sampled")
+
+    agree_all  = float((labels == df['priority'].to_numpy()).mean() * 100)
+    test_mask  = split == 2
+    agree_test = float((labels[test_mask] == df['priority'].to_numpy()[test_mask]).mean() * 100) \
+        if test_mask.any() else None
+    print(f"    Agreement    : {agree_all:.1f}% over all rows"
+          + (f", {agree_test:.1f}% on the held-out test rows" if agree_test is not None else ""))
+
+    return {
+        'labels': labels,
+        'confidence': conf,
+        'split': split,
+        'model_name': type(bundle.priority_model).__name__,
+        'agreement_all': round(agree_all, 1),
+        'agreement_test': None if agree_test is None else round(agree_test, 1),
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Embedded payload
+#
+#  The browser gets one byte per categorical value per bug, base64'd. 50k rows
+#  across ~20 columns is about 1 MB of binary — small enough to inline, and it
+#  buys genuine cross-filtering: every recompute is a single linear scan over
+#  typed arrays rather than a round trip to a server that isn't there.
+# ──────────────────────────────────────────────────────────────────────────────
+def enc_u8(values):
+    return base64.b64encode(np.asarray(values, dtype=np.uint8).tobytes()).decode('ascii')
+
+
+def enc_u16(values):
+    return base64.b64encode(np.asarray(values, dtype='<u2').tobytes()).decode('ascii')
+
+
+def enc_i16(values):
+    return base64.b64encode(np.asarray(values, dtype='<i2').tobytes()).decode('ascii')
+
+
+def enc_u32(values):
+    return base64.b64encode(np.asarray(values, dtype='<u4').tobytes()).decode('ascii')
+
+
+def codes(series, order):
+    """Categorical codes against a fixed level order.
+
+    Unknown/missing values fall back to level 0 rather than -1: a negative code
+    would index past the front of the JS label array and render as 'undefined'.
+    """
+    cat = pd.Categorical(series.astype(str), categories=[str(v) for v in order])
+    arr = cat.codes.astype(np.int16)
+    if (arr < 0).any():
+        arr = np.where(arr < 0, 0, arr)
+    return arr.astype(np.uint8)
+
+
+def levels(series, preferred=None):
+    """Fixed level order for one column: preferred first, then the rest sorted."""
+    present = sorted({str(v) for v in series.dropna().unique()})
+    if not preferred:
+        return present
+    ordered = [str(v) for v in preferred if str(v) in present]
+    return ordered + [v for v in present if v not in ordered]
+
+
+VERDICTS = [
+    {
+        'target': 'Bug Category',
+        'status': 'critical',
+        'label': 'Leakage, not a result',
+        'narrative': [
+            'Every model scores near-perfect accuracy on Bug Category — and that is not generalization. ',
+            {'code': 'title'}, ', ', {'code': 'description'}, ', ', {'code': 'root_cause'}, ' and ',
+            {'code': 'suggested_fix'},
+            ' are boilerplate templates: only 16 unique strings across the whole dataset, one fixed '
+            'template per category, so the model is matching a copied template back to the label it was '
+            'copied from. Treat this target as unlearnable until the source data carries genuine free text.',
+        ],
+    },
+    {
+        'target': 'Severity',
+        'status': 'critical',
+        'label': 'No predictive signal',
+        'narrative': [
+            'Every model lands at chance level for four classes (~25%). Severity was tested against '
+            'bug_category, bug_domain, environment, error_code, developer_role and the description text '
+            'itself: none carries usable signal, and every split lands within a point or two of uniform. '
+            'Severity appears to be assigned independently at random in the source data — ',
+            {'strong': 'no model can beat chance on it from this dataset'},
+            ', text-based or feature-based.',
+        ],
+    },
+    {
+        'target': 'Priority',
+        'status': 'good',
+        'label': 'Learnable — with a caveat',
+        'narrative': [
+            'Unlike the other two targets, the five models genuinely spread out here, and Random Forest '
+            'separates from the rest — a real, learnable relationship. The caveat: priority is a ',
+            {'strong': 'derived field'},
+            ', computed from the structured features by a documented scoring rule plus ~8% seeded jitter, '
+            'so the models recover that rule rather than predicting real-world triage priority. Read it as '
+            'proof the pipeline trains and ranks models correctly on a learnable target — not as evidence '
+            'priority is predictable from the raw Kaggle data, which has no priority field at all.',
+        ],
+    },
+]
+
+
+def build_payload(df, kpis, catalog, kb, model_eval, scores, origin, snapshot):
+    targets = sla_targets(catalog)
+    kloc    = module_kloc(catalog, df)
+
+    dim_specs = [
+        ('module',      'module',          None),
+        ('feature',     'feature',         None),
+        ('component',   'component',       None),
+        ('priority',    'priority',        PRIORITY_ORDER),
+        ('severity',    'severity',        SEVERITY_ORDER),
+        ('status',      'status',          STATUS_ORDER),
+        ('resolution',  'resolution',      RESOLUTION_ORDER),
+        ('sprint',      'sprint',          None),
+        ('release',     'release_version', None),
+        ('category',    'bug_category',    None),
+        ('domain',      'bug_domain',      None),
+        ('environment', 'environment',     ENVIRONMENT_ORDER),
+        ('tech',        'tech_stack',      None),
+        ('errorCode',   'error_code',      None),
+        ('team',        'assigned_team',   None),
+        ('lifecycle',   'lifecycle_stage', LIFECYCLE_ORDER),
+        ('month',       'month',           None),
+    ]
+
+    dims, cols = {}, {}
+    for name, column, preferred in dim_specs:
+        if column == 'error_code':
+            series = df[column].fillna(0).astype(float).astype(int).astype(str)
+        else:
+            series = df[column].astype(str)
+        order = levels(series, preferred)
+        dims[name] = order
+        cols[name] = enc_u8(codes(series, order))
+
+    # Closure position: which sprint / month the bug actually closed in.
+    close_sprint = (df['close_sprint_index'].fillna(0).astype(int)
+                    .clip(0, len(dims['sprint']) - 1))
+    cols['closeSprint'] = enc_u8(close_sprint)
+
+    month_index = {label: i for i, label in enumerate(dims['month'])}
+    close_month = df['close_month'].map(month_index).fillna(255).astype(int).clip(0, 255)
+    cols['closeMonth'] = enc_u8(close_month)
+
+    # Predictions. Absent models leave the columns flat and modelScored false,
+    # so the model view can say so rather than showing a fake diagonal.
+    if scores is not None:
+        pri_index = {label: i for i, label in enumerate(dims['priority'])}
+        cols['predPriority'] = enc_u8(pd.Series(scores['labels']).map(pri_index).fillna(0).astype(int))
+        conf = np.nan_to_num(scores['confidence'], nan=0.0)
+        cols['predConf'] = enc_u8(np.clip(np.round(conf * 100), 0, 100).astype(int))
+        cols['split'] = enc_u8(scores['split'])
+    else:
+        zeros = np.zeros(len(df), dtype=np.uint8)
+        cols['predPriority'] = enc_u8(zeros)
+        cols['predConf'] = enc_u8(zeros)
+        cols['split'] = enc_u8(zeros)
+
+    res_days = df['resolution_days'].fillna(-1).astype(float).clip(-1, 32000).astype(int)
+
+    # Bug IDs are BUG_nnnnnn. When they run 1..N in row order — which they do
+    # for an untouched pipeline — the page rebuilds them from the row index
+    # instead of carrying a 200 KB id column.
+    numeric_ids = (df['bug_id'].astype(str).str.extract(r'(\d+)')[0]
+                   .astype('Int64').fillna(0).astype(int).to_numpy())
+    sequential = bool(np.array_equal(numeric_ids, np.arange(1, len(df) + 1)))
+    ids = {'seq': True} if sequential else {'seq': False, 'data': enc_u32(numeric_ids)}
+
+    # Per-category lookups: 16 templates for the whole dataset, so the page
+    # stores 16 strings and an index rather than 50,000 repeated ones.
+    def by_category(field, kb_key):
+        out = []
+        for cat in dims['category']:
+            entry = (kb or {}).get(cat, {})
+            value = entry.get(kb_key)
+            if not value:
+                sub = df.loc[df['bug_category'].astype(str) == cat, field]
+                value = str(sub.iloc[0]) if len(sub) else cat
+            out.append(str(value))
+        return out
+
+    routing = {cat: (kb or {}).get(cat, {}).get('assigned_role', 'Full-Stack Developer')
+               for cat in dims['category']}
+
+    payload = {
+        'meta': {
+            'generated':  kpis['generated_at'],
+            'snapshot':   kpis['headline']['snapshot_date'],
+            'origin':     origin.strftime('%Y-%m-%d'),
+            'originMs':   int(pd.Timestamp(origin).timestamp() * 1000),
+            'snapshotDay': int((snapshot - origin).days),
+            'rows':       int(len(df)),
+            'sprintDays': SPRINT_LENGTH_DAYS,
+            # The reporting window starts and ends mid-month, so the first and
+            # last points of a monthly series cover fewer days than the rest.
+            # Flagged rather than dropped, so the chart can say why they dip.
+            'monthFirstPartial': bool(pd.Timestamp(origin).day > 1),
+            'monthLastPartial':  bool(pd.Timestamp(snapshot).day
+                                      < pd.Timestamp(snapshot).days_in_month),
+            'monthFirst': dims['month'][0] if dims['month'] else None,
+            'monthLast':  dims['month'][-1] if dims['month'] else None,
+            'modelScored': scores is not None,
+            'modelName':  scores['model_name'] if scores else None,
+            'agreementAll':  scores['agreement_all'] if scores else None,
+            'agreementTest': scores['agreement_test'] if scores else None,
+        },
+        'dims': dims,
+        'cols': cols,
+        'u16':  {'createdDay': enc_u16(df['created_day'].clip(0, 65535))},
+        'i16':  {'resDays': enc_i16(res_days)},
+        'ids':  ids,
+        'lookups': {
+            'slaByPriority':       [int(targets.get(p, 30)) for p in dims['priority']],
+            'klocByModule':        [round(float(kloc.get(m, 1.0)), 1) for m in dims['module']],
+            'rootCauseByCategory': by_category('root_cause', 'root_cause'),
+            'fixByCategory':       by_category('suggested_fix', 'suggested_fix'),
+            'titleByCategory':     by_category('title', 'sample_title'),
+        },
+        'kpis':      kpis,
+        'insights':  kpis['insights'],
+        'modelEval': model_eval,
+        'modelOrder': MODEL_ORDER,
+        'verdicts':  [v for v in VERDICTS if model_eval.get(v['target'])],
+        'routing':   {'by_category': routing, 'domain_override': DOMAIN_OVERRIDE},
+        'priorityNote': model_bridge.PRIORITY_NOTE,
+        'severityNote': model_bridge.SEVERITY_NOTE,
+    }
+    return payload
+
+
+def read_asset(name):
+    """Load one of the front-end files that get inlined into the dashboard."""
+    path = os.path.join(SRC_DIR, 'dashboard', name)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Dashboard asset '{name}' not found at {path}. The src/dashboard/ "
+            f"folder ships index_template.html, theme.css and app.js.")
+    with open(path, encoding='utf-8') as f:
+        return f.read()
+
+
+def build_dashboard(payload):
+    os.makedirs('dashboards', exist_ok=True)
+
+    # '<' is escaped so a label can never terminate the <script> block early.
+    data = json.dumps(payload, separators=(',', ':'), allow_nan=False).replace('<', '\\u003c')
+
+    html = (read_asset('index_template.html')
+            .replace('/*__CSS__*/', read_asset('theme.css'))
+            .replace('/*__JS__*/', read_asset('app.js'))
+            .replace('__SNAPSHOT__', payload['meta']['snapshot'])
+            .replace('__TOTAL__', f"{payload['meta']['rows']:,}")
+            .replace('__DATA__', data))
+
+    with open(DASHBOARD_PATH, 'w', encoding='utf-8') as f:
+        f.write(html)
+    return DASHBOARD_PATH, len(data)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Static companion charts (the printable/report versions)
 # ──────────────────────────────────────────────────────────────────────────────
 def save_fig(fig, name):
     path = f"visualizations/{name}.png"
@@ -560,6 +894,12 @@ def save_fig(fig, name):
 
 
 def chart_sprint_trend(kpis):
+    """Intake vs closure, with the backlog in its own panel below.
+
+    Two measures on two y-scales in one plot invents a correlation the data
+    doesn't contain, so the backlog gets a stacked panel on a shared x-axis
+    instead of a secondary axis.
+    """
     rows = kpis['by_sprint']
     labels  = [r['sprint'] for r in rows]
     opened  = [r['opened'] for r in rows]
@@ -567,34 +907,29 @@ def chart_sprint_trend(kpis):
     backlog = [r['backlog'] for r in rows]
     x = np.arange(len(labels))
 
-    fig, ax = plt.subplots(figsize=(14, 6))
-    ax.bar(x - 0.2, opened, width=0.4, label='Opened', color='#E53935',
-           edgecolor='white', linewidth=0.6)
-    ax.bar(x + 0.2, closed, width=0.4, label='Closed', color='#43A047',
-           edgecolor='white', linewidth=0.6)
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    fig, (ax, ax2) = plt.subplots(
+        2, 1, figsize=(14, 7.5), sharex=True,
+        gridspec_kw={'height_ratios': [2.1, 1], 'hspace': 0.12})
+
+    ax.bar(x - 0.21, opened, width=0.4, label='Opened', color='#2a78d6')
+    ax.bar(x + 0.21, closed, width=0.4, label='Closed', color='#1baf7a')
     ax.set_ylabel('Bugs in sprint', fontsize=12)
-    ax.set_xlabel('Sprint', fontsize=12)
     ax.set_title('Sprint-wise Bug Intake vs Closure, with Carried-over Backlog',
-                 fontsize=15, fontweight='bold', pad=38)
+                 fontsize=15, fontweight='bold', pad=34)
     ax.spines[['top', 'right']].set_visible(False)
+    ax.legend(loc='lower left', bbox_to_anchor=(0, 1.005), ncol=2, frameon=False)
 
-    ax2 = ax.twinx()
-    ax2.plot(x, backlog, color='#1565C0', linewidth=2.5, marker='o',
-             markersize=4, label='Open backlog')
-    ax2.set_ylabel('Cumulative open backlog', fontsize=12, color='#1565C0')
-    ax2.tick_params(axis='y', labelcolor='#1565C0')
-    ax2.grid(False)
+    ax2.fill_between(x, backlog, color='#4a3aa7', alpha=0.10)
+    ax2.plot(x, backlog, color='#4a3aa7', linewidth=2, marker='o', markersize=3.5)
+    ax2.set_ylabel('Open backlog', fontsize=12)
+    ax2.set_xlabel('Sprint', fontsize=12)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
+    ax2.spines[['top', 'right']].set_visible(False)
+    ax2.annotate(f"{backlog[-1]:,}", xy=(x[-1], backlog[-1]),
+                 xytext=(-6, 8), textcoords='offset points',
+                 ha='right', fontsize=10, fontweight='bold')
 
-    # Every sprint has a tall bar, so the legend goes above the plot rather than
-    # inside it, where it would cover the first three sprints.
-    handles = ax.get_legend_handles_labels()[0] + ax2.get_legend_handles_labels()[0]
-    labels_ = ax.get_legend_handles_labels()[1] + ax2.get_legend_handles_labels()[1]
-    ax.legend(handles, labels_, loc='lower left', bbox_to_anchor=(0, 1.005),
-              ncol=3, frameon=False)
-
-    fig.tight_layout()
     return save_fig(fig, 'kpi_sprint_trend')
 
 
@@ -604,7 +939,7 @@ def chart_module_priority_heatmap(df):
     pivot = pivot.loc[pivot.sum(axis=1).sort_values(ascending=False).index]
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
-    sns.heatmap(pivot, annot=True, fmt=',d', cmap='rocket_r', linewidths=1.2,
+    sns.heatmap(pivot, annot=True, fmt=',d', cmap='Blues', linewidths=2,
                 linecolor='white', cbar_kws={'label': 'Bugs'}, ax=ax,
                 annot_kws={'fontsize': 9, 'fontweight': 'bold'})
     ax.set_title('Bug Distribution — Module x Priority', fontsize=15,
@@ -623,13 +958,11 @@ def chart_resolution_time(kpis):
     x = np.arange(len(labels))
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    colors = ['#B71C1C', '#E53935', '#FB8C00', '#FDD835', '#43A047']
-    bars = ax.bar(x, avg, width=0.55, color=colors[:len(labels)],
-                  edgecolor='white', linewidth=1.2, label='Actual average')
+    bars = ax.bar(x, avg, width=0.5, color='#2a78d6', label='Actual average')
 
     for xi, target in zip(x, targets):
-        ax.hlines(target, xi - 0.32, xi + 0.32, colors='#1565C0',
-                  linestyles='--', linewidth=2.2)
+        ax.hlines(target, xi - 0.3, xi + 0.3, colors='#52514e',
+                  linestyles='--', linewidth=2)
 
     # The SLA marker sits above the bar whenever the team is beating its target,
     # so the value label clears whichever of the two is higher.
@@ -639,7 +972,7 @@ def chart_resolution_time(kpis):
                 max(bar.get_height(), target) + ceiling * 0.02,
                 f'{value:.1f} d', ha='center', va='bottom', fontsize=10, fontweight='bold')
 
-    ax.plot([], [], color='#1565C0', linestyle='--', linewidth=2.2, label='SLA target')
+    ax.plot([], [], color='#52514e', linestyle='--', linewidth=2, label='SLA target')
 
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
@@ -647,8 +980,8 @@ def chart_resolution_time(kpis):
                  fontsize=15, fontweight='bold', pad=15)
     ax.set_xlabel('Priority (P1 = highest)', fontsize=12)
     ax.set_ylabel('Days to close', fontsize=12)
-    ax.set_ylim(0, max(max(avg), max(targets)) * 1.2)
-    ax.legend(frameon=True)
+    ax.set_ylim(0, ceiling * 1.2)
+    ax.legend(frameon=False)
     ax.spines[['top', 'right']].set_visible(False)
     fig.tight_layout()
     return save_fig(fig, 'kpi_resolution_time_by_priority')
@@ -660,8 +993,7 @@ def chart_defect_density(kpis):
     density = [r['defect_density'] for r in rows]
 
     fig, ax = plt.subplots(figsize=(11, 6))
-    palette = sns.color_palette('flare', len(rows))
-    bars = ax.barh(labels, density, color=palette, edgecolor='white', linewidth=1.0)
+    bars = ax.barh(labels, density, color='#2a78d6')
     for bar, row in zip(bars, rows):
         ax.text(bar.get_width() + max(density) * 0.012,
                 bar.get_y() + bar.get_height() / 2,
@@ -684,10 +1016,9 @@ def chart_release_quality(kpis):
     x = np.arange(len(labels))
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.bar(x, closed, width=0.6, label='Closed', color='#43A047',
-           edgecolor='white', linewidth=0.8)
-    ax.bar(x, still_open, width=0.6, bottom=closed, label='Still open',
-           color='#E53935', edgecolor='white', linewidth=0.8)
+    ax.bar(x, closed, width=0.58, label='Closed', color='#1baf7a')
+    ax.bar(x, still_open, width=0.58, bottom=closed, label='Still open',
+           color='#e34948', edgecolor='white', linewidth=2)
     for xi, row in zip(x, rows):
         ax.text(xi, row['bugs'] + max(r['bugs'] for r in rows) * 0.015,
                 f"{row['close_rate_pct']:.0f}% closed", ha='center', va='bottom',
@@ -701,7 +1032,7 @@ def chart_release_quality(kpis):
     ax.set_ylabel('Number of bugs', fontsize=12)
     ax.set_ylim(0, max(r['bugs'] for r in rows) * 1.18)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.legend(frameon=True)
+    ax.legend(frameon=False)
     ax.spines[['top', 'right']].set_visible(False)
     fig.tight_layout()
     return save_fig(fig, 'kpi_release_quality')
@@ -719,427 +1050,25 @@ def build_static_charts(df, kpis):
     ]
 
 
-def max_sprint_index(df):
-    """Highest 0-based sprint index present in the 'SPR-nn' labels."""
-    numbers = df['sprint'].astype(str).str.extract(r'(\d+)')[0].dropna().astype(int)
-    return int(numbers.max()) - 1 if len(numbers) else 0
-
-
-def read_asset(name):
-    """Load one of the front-end files that get inlined into a report."""
-    path = os.path.join(SRC_DIR, 'dashboard', name)
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Dashboard asset '{name}' not found at {path}. The src/dashboard/ "
-            f"folder ships the *_template.html, theme.css and interactions.js files.")
-    with open(path, encoding='utf-8') as f:
-        return f.read()
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  Two server-rendered reports, one per audience
-#
-#  Triage & Ops (ops_dashboard.html) ranks what needs attention now — stat
-#  tiles, the data-driven insights, and hotspot tables — for engineering
-#  managers and triage leads. Model Report (model_report.html) is the honest
-#  read on what's actually learnable from this data, for data-science
-#  reviewers. Both are plain server-rendered HTML: every table/chart is built
-#  once in Python from the already-computed KPIs, so there is no client-side
-#  filter/decode engine to keep in sync. The only JS is column sort.
-# ──────────────────────────────────────────────────────────────────────────────
-def esc(value):
-    return html.escape(str(value))
-
-
-def fmt_days(value):
-    return '—' if value is None else f"{value:.1f}"
-
-
-def sla_status(pct):
-    if pct >= 85:
-        return 'good', 'On track'
-    if pct >= 70:
-        return 'warning', 'Watch'
-    return 'critical', 'At risk'
-
-
-STATUS_ICON = {'good': '✓', 'warning': '⚠', 'serious': '⚠', 'critical': '✕'}
-
-
-def badge_html(status, label):
-    return f'<span class="badge badge-{status}">{STATUS_ICON.get(status, "")} {esc(label)}</span>'
-
-
-def stat_tile(value, label, context, status=None):
-    cls = f' status-{status}' if status else ''
-    return (f'<div class="stat-tile{cls}"><div class="value">{value}</div>'
-            f'<div class="label">{esc(label)}</div><div class="context">{context}</div></div>')
-
-
-def bar_cell(display, value, max_value):
-    """A right-aligned <td> whose value is echoed both as text and as an
-    inline magnitude bar, so a ranked table reads at a glance without a
-    separate chart."""
-    pct = 0 if max_value <= 0 else max(0.0, min(100.0, value / max_value * 100))
-    return (f'<td data-sort="{value}"><div class="bar-cell">'
-            f'<span class="bar-value">{display}</span>'
-            f'<span class="bar-track"><span class="bar-fill" style="width:{pct:.1f}%"></span></span>'
-            f'</div></td>')
-
-
-def table_html(headers, rows):
-    ths = ''.join(f'<th>{esc(h)}</th>' for h in headers)
-    return f'<table data-sortable><thead><tr>{ths}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
-
-
-# ── Triage & Ops components ─────────────────────────────────────────────────
-def build_stat_tiles(kpis):
-    head = kpis['headline']
-    by_sprint = kpis['by_sprint']
-    last = by_sprint[-1] if by_sprint else None
-    prev = by_sprint[-2] if len(by_sprint) > 1 else None
-
-    open_status = 'critical' if head['open_past_sla'] > head['open_bugs'] * 0.5 \
-        else ('warning' if head['open_past_sla'] > 0 else 'good')
-    sla_status_, _ = sla_status(head['sla_compliance_pct'])
-    reopen_status = 'critical' if head['reopen_rate_pct'] > 5 \
-        else ('warning' if head['reopen_rate_pct'] > 2 else 'good')
-
-    tiles = [
-        stat_tile(f"{head['open_bugs']:,}", 'Open bugs',
-                  f"{head['open_past_sla']:,} past SLA target", open_status),
-        stat_tile(f"{head['sla_compliance_pct']:.1f}%", 'SLA compliance',
-                  "of closed bugs met their target", sla_status_),
-        stat_tile(f"{head['avg_resolution_days']:.1f}d", 'Avg resolution time',
-                  f"median {head['median_resolution_days']:.0f}d &middot; "
-                  f"p90 {head['p90_resolution_days']:.0f}d"),
-        stat_tile(f"{head['defect_density']:.1f}", 'Defect density / KLOC',
-                  f"across {head['total_kloc']:,.0f} KLOC tracked"),
-        stat_tile(f"{head['reopen_rate_pct']:.1f}%", 'Reopen rate',
-                  "bugs that failed verification", reopen_status),
-    ]
-
-    if last is not None:
-        if prev is not None:
-            delta = last['backlog'] - prev['backlog']
-            trend_status = 'good' if delta <= 0 else \
-                ('warning' if delta <= max(last['backlog'], 1) * 0.05 else 'critical')
-            trend_text = f"{'+' if delta >= 0 else ''}{delta:,} vs prior sprint"
-        else:
-            trend_status, trend_text = None, 'first sprint on record'
-        tiles.append(stat_tile(f"{last['backlog']:,}", 'Open backlog (latest sprint)',
-                                trend_text, trend_status))
-
-    return '\n'.join(tiles)
-
-
-def build_insight_cards(insights):
-    cards = [
-        f'<div class="insight-card"><div class="insight-rank">{i}</div>'
-        f'<div class="insight-body"><h3>{esc(item["title"])}</h3><p>{esc(item["detail"])}</p></div></div>'
-        for i, item in enumerate(insights, 1)
-    ]
-    return '\n'.join(cards)
-
-
-def build_sprint_svg(by_sprint):
-    rows = by_sprint
-    n = len(rows)
-    if n == 0:
-        return '<p class="note">No sprint data.</p>'
-
-    labels  = [r['sprint'] for r in rows]
-    opened  = [r['opened'] for r in rows]
-    closed  = [r['closed'] for r in rows]
-    backlog = [max(r['backlog'], 0) for r in rows]
-    max_val = max(max(opened), max(closed), max(backlog), 1)
-
-    width, height = 960, 300
-    pad_l, pad_t, pad_r, pad_b = 46, 22, 12, 30
-    plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
-    group_w = plot_w / n
-    bar_w = min(group_w * 0.34, 14)
-    baseline_y = pad_t + plot_h
-
-    def y(v):
-        return pad_t + plot_h - (v / max_val) * plot_h
-
-    grid, bars = [], []
-    for i in range(5):
-        val = max_val * i / 4
-        yy = y(val)
-        grid.append(f'<line class="grid-line" x1="{pad_l}" x2="{width - pad_r}" y1="{yy:.1f}" y2="{yy:.1f}"/>')
-        grid.append(f'<text class="tick-text" x="{pad_l - 8}" y="{yy + 3:.1f}" text-anchor="end">{round(val):,}</text>')
-
-    label_step = max(1, -(-n // 12))  # show at most ~12 x-axis labels
-    for i in range(n):
-        cx = pad_l + group_w * i + group_w / 2
-        bx_o, bx_c = cx - bar_w - 1, cx + 1
-        bars.append(f'<rect x="{bx_o:.1f}" y="{y(opened[i]):.1f}" width="{bar_w:.1f}" '
-                    f'height="{baseline_y - y(opened[i]):.1f}" fill="var(--series-1)" rx="2">'
-                    f'<title>{esc(labels[i])} opened: {opened[i]:,}</title></rect>')
-        bars.append(f'<rect x="{bx_c:.1f}" y="{y(closed[i]):.1f}" width="{bar_w:.1f}" '
-                    f'height="{baseline_y - y(closed[i]):.1f}" fill="var(--series-3)" rx="2">'
-                    f'<title>{esc(labels[i])} closed: {closed[i]:,}</title></rect>')
-        if i % label_step == 0 or i == n - 1:
-            bars.append(f'<text class="tick-text" x="{cx:.1f}" y="{height - pad_b + 16}" '
-                        f'text-anchor="middle">{esc(labels[i])}</text>')
-
-    pts = ' '.join(f"{pad_l + group_w * i + group_w / 2:.1f},{y(backlog[i]):.1f}" for i in range(n))
-    line = f'<polyline points="{pts}" fill="none" stroke="var(--series-7)" stroke-width="2.5"/>'
-    dots = ''.join(
-        f'<circle cx="{pad_l + group_w * i + group_w / 2:.1f}" cy="{y(backlog[i]):.1f}" r="2.5" '
-        f'fill="var(--series-7)"><title>{esc(labels[i])} backlog: {backlog[i]:,}</title></circle>'
-        for i in range(n))
-
-    axis = (f'<line class="axis-line" x1="{pad_l}" x2="{pad_l}" y1="{pad_t}" y2="{baseline_y}"/>'
-            f'<line class="axis-line" x1="{pad_l}" x2="{width - pad_r}" y1="{baseline_y}" y2="{baseline_y}"/>')
-
-    legend = (f'<g class="legend-text">'
-              f'<rect x="{pad_l}" y="2" width="10" height="10" fill="var(--series-1)" rx="2"/>'
-              f'<text x="{pad_l + 14}" y="11">Opened</text>'
-              f'<rect x="{pad_l + 88}" y="2" width="10" height="10" fill="var(--series-3)" rx="2"/>'
-              f'<text x="{pad_l + 102}" y="11">Closed</text>'
-              f'<line x1="{pad_l + 176}" x2="{pad_l + 192}" y1="7" y2="7" stroke="var(--series-7)" stroke-width="2.5"/>'
-              f'<text x="{pad_l + 198}" y="11">Open backlog</text></g>')
-
-    return (f'<svg viewBox="0 0 {width} {height}" role="img" '
-            f'aria-label="Sprint intake, closure and backlog">'
-            f'{legend}<g>{"".join(grid)}{axis}{"".join(bars)}{line}{dots}</g></svg>')
-
-
-def build_module_table(rows):
-    max_density = max((r['defect_density'] for r in rows), default=1) or 1
-    trs = [
-        '<tr><td>' + esc(r['module']) + '</td>'
-        + f'<td data-sort="{r["bugs"]}">{r["bugs"]:,}</td>'
-        + f'<td data-sort="{r["open"]}">{r["open"]:,}</td>'
-        + f'<td data-sort="{r["size_kloc"]}">{r["size_kloc"]:.1f}</td>'
-        + bar_cell(f"{r['defect_density']:.1f}", r['defect_density'], max_density)
-        + f'<td data-sort="{r["avg_days"] or 0}">{fmt_days(r["avg_days"])}</td>'
-        + f'<td data-sort="{r["close_rate_pct"]}">{r["close_rate_pct"]:.0f}%</td></tr>'
-        for r in rows
-    ]
-    return table_html(['Module', 'Bugs', 'Open', 'KLOC', 'Defect density', 'Avg days', 'Closed %'], trs)
-
-
-def build_team_table(rows):
-    max_assigned = max((r['assigned'] for r in rows), default=1) or 1
-    trs = [
-        '<tr><td>' + esc(r['team']) + '</td>'
-        + bar_cell(f"{r['assigned']:,}", r['assigned'], max_assigned)
-        + f'<td data-sort="{r["open"]}">{r["open"]:,}</td>'
-        + f'<td data-sort="{r["urgent_open"]}">{r["urgent_open"]:,}</td>'
-        + f'<td data-sort="{r["avg_days"] or 0}">{fmt_days(r["avg_days"])}</td>'
-        + f'<td data-sort="{r["sla_pct"]}">{r["sla_pct"]:.1f}% {badge_html(*sla_status(r["sla_pct"]))}</td></tr>'
-        for r in rows
-    ]
-    return table_html(['Team', 'Assigned', 'Open', 'Urgent open', 'Avg days', 'SLA'], trs)
-
-
-def build_release_table(rows):
-    rows = sorted(rows, key=lambda r: -r['urgent_open'])
-    max_uo = max((r['urgent_open'] for r in rows), default=1) or 1
-    trs = [
-        '<tr><td>' + esc(r['release']) + '</td>'
-        + f'<td data-sort="{r["bugs"]}">{r["bugs"]:,}</td>'
-        + f'<td data-sort="{r["open"]}">{r["open"]:,}</td>'
-        + bar_cell(f"{r['urgent_open']:,}", r['urgent_open'], max_uo)
-        + f'<td data-sort="{r["close_rate_pct"]}">{r["close_rate_pct"]:.0f}%</td></tr>'
-        for r in rows
-    ]
-    return table_html(['Release', 'Bugs', 'Open', 'Urgent open (P1/P2)', 'Closed %'], trs)
-
-
-def build_priority_table(rows):
-    trs = [
-        '<tr><td>' + esc(r['priority']) + '</td>'
-        + f'<td data-sort="{r["bugs"]}">{r["bugs"]:,}</td>'
-        + f'<td data-sort="{r["sla_target_days"]}">{r["sla_target_days"]}d</td>'
-        + f'<td data-sort="{r["avg_days"] or 0}">{fmt_days(r["avg_days"])}</td>'
-        + f'<td data-sort="{r["median_days"] or 0}">{fmt_days(r["median_days"])}</td>'
-        + f'<td data-sort="{r["sla_pct"]}">{r["sla_pct"]:.1f}% {badge_html(*sla_status(r["sla_pct"]))}</td></tr>'
-        for r in rows
-    ]
-    return table_html(['Priority', 'Bugs', 'Target', 'Avg days', 'Median days', 'SLA'], trs)
-
-
-def build_rootcause_table(rows, top=5):
-    rows = rows[:top]
-    max_bugs = max((r['bugs'] for r in rows), default=1) or 1
-    trs = [
-        '<tr><td>' + esc(shorten(r['root_cause'], 70)) + '</td>'
-        + bar_cell(f"{r['bugs']:,}", r['bugs'], max_bugs)
-        + f'<td data-sort="{r["share_pct"]}">{r["share_pct"]:.1f}%</td>'
-        + f'<td data-sort="{r["avg_days"] or 0}">{fmt_days(r["avg_days"])}</td>'
-        + f'<td data-sort="{r["urgent"]}">{r["urgent"]:,}</td></tr>'
-        for r in rows
-    ]
-    return table_html(['Root cause', 'Bugs', 'Share', 'Avg days', 'Urgent'], trs)
-
-
-def build_ops_dashboard(kpis, insights):
-    os.makedirs('dashboards', exist_ok=True)
-    head = kpis['headline']
-
-    out = (read_asset('ops_template.html')
-           .replace('/*__CSS__*/', read_asset('theme.css'))
-           .replace('/*__JS__*/', read_asset('interactions.js'))
-           .replace('__GENERATED__', kpis['generated_at'])
-           .replace('__SNAPSHOT__', head['snapshot_date'])
-           .replace('__TOTAL__', f"{head['total_bugs']:,}")
-           .replace('<!--__STAT_TILES__-->', build_stat_tiles(kpis))
-           .replace('<!--__INSIGHTS__-->', build_insight_cards(insights))
-           .replace('<!--__SPRINT_CHART__-->', build_sprint_svg(kpis['by_sprint']))
-           .replace('<!--__MODULE_TABLE__-->', build_module_table(kpis['by_module']))
-           .replace('<!--__TEAM_TABLE__-->', build_team_table(kpis['by_team']))
-           .replace('<!--__RELEASE_TABLE__-->', build_release_table(kpis['by_release']))
-           .replace('<!--__PRIORITY_TABLE__-->', build_priority_table(kpis['by_priority']))
-           .replace('<!--__ROOTCAUSE_TABLE__-->', build_rootcause_table(kpis['by_root_cause'])))
-
-    with open(OPS_PATH, 'w', encoding='utf-8') as f:
-        f.write(out)
-    return OPS_PATH
-
-
-# ── Model Report components ─────────────────────────────────────────────────
-def pct_range(accs):
-    """'25.6–26.0%' normally, or a single '100.0%' when every model ties."""
-    lo, hi = min(accs) * 100, max(accs) * 100
-    return f"{hi:.1f}%" if abs(hi - lo) < 0.05 else f"{lo:.1f}–{hi:.1f}%"
-
-
-def build_model_bars(target_rows):
-    items = sorted(((m, target_rows[m]['Accuracy']) for m in MODEL_ORDER if m in target_rows),
-                    key=lambda t: -t[1])
-    best = items[0][0] if items else None
-    rows_html = []
-    for name, acc in items:
-        slot = MODEL_SLOT.get(name, 1)
-        best_cls = ' is-best' if name == best else ''
-        rows_html.append(
-            f'<div class="hbar-row{best_cls}"><div class="hbar-label">{esc(name)}</div>'
-            f'<div class="hbar-track"><div class="hbar-fill" '
-            f'style="width:{acc * 100:.1f}%;background:var(--series-{slot})"></div></div>'
-            f'<div class="hbar-value">{acc * 100:.1f}%</div></div>')
-    return f'<div class="hbar-chart">{"".join(rows_html)}</div>'
-
-
-def build_verdict(title, status, label, narrative, target_rows):
-    return (
-        '<div class="verdict-card">'
-        f'<div class="verdict-head"><h2>{esc(title)}</h2>{badge_html(status, label)}</div>'
-        f'<p class="lede">{narrative}</p>'
-        + build_model_bars(target_rows)
-        + '</div>'
-    )
-
-
-def build_category_verdict(model_eval, n_total):
-    rows = model_eval.get('Bug Category', {})
-    if not rows:
-        return ''
-    accs = [v['Accuracy'] for v in rows.values()]
-    narrative = (
-        f"All {len(rows)} models score {pct_range(accs)} accuracy "
-        f"on Bug Category &mdash; that isn't generalization. <code>title</code>, "
-        f"<code>description</code>, <code>root_cause</code> and <code>suggested_fix</code> are "
-        f"boilerplate templates: only 16 unique strings across all {n_total:,} rows, one fixed "
-        f"template per category, so the model is matching a copied template back to the label it "
-        f"was copied from. Treat this target as unlearnable until the source data carries genuine "
-        f"free text.")
-    return build_verdict('Bug Category', 'critical', 'Leakage, not a result', narrative, rows)
-
-
-def build_severity_verdict(model_eval):
-    rows = model_eval.get('Severity', {})
-    if not rows:
-        return ''
-    accs = [v['Accuracy'] for v in rows.values()]
-    n_classes = len(SEVERITY_ORDER)
-    narrative = (
-        f"Every model lands within {pct_range(accs)} accuracy on "
-        f"Severity &mdash; essentially chance level for {n_classes} classes (~{100 / n_classes:.0f}%). "
-        f"We tested severity against bug_category, bug_domain, environment, error_code, "
-        f"developer_role and the description text itself: none carry a usable signal, every split "
-        f"lands within a point or two of uniform. Severity appears to be assigned independently at "
-        f"random in the source data &mdash; no model, text-based or feature-based, can beat chance "
-        f"on it from this dataset.")
-    return build_verdict('Severity', 'critical', 'No predictive signal', narrative, rows)
-
-
-def build_priority_verdict(model_eval):
-    rows = model_eval.get('Priority', {})
-    if not rows:
-        return ''
-    accs = [v['Accuracy'] for v in rows.values()]
-    best_name, best_metrics = max(rows.items(), key=lambda kv: kv[1]['Accuracy'])
-    narrative = (
-        f"{esc(best_name)} reaches {best_metrics['Accuracy'] * 100:.1f}% accuracy on Priority, and "
-        f"unlike the other two targets, the five models actually spread out "
-        f"({pct_range(accs)}) &mdash; a real, learnable relationship. "
-        f"The caveat: priority is a <strong>derived field</strong>, computed from structured features "
-        f"by a documented scoring rule plus ~8% seeded jitter, so the models are recovering that rule, "
-        f"not predicting real-world triage priority. Read this as proof the pipeline trains and ranks "
-        f"models correctly on a learnable target &mdash; not as evidence priority is predictable from "
-        f"the raw Kaggle data, which has no priority field at all.")
-    return build_verdict('Priority', 'good', 'Learnable — with a caveat', narrative, rows)
-
-
-def build_comparison_table(model_eval):
-    targets = ['Severity', 'Priority', 'Bug Category']
-    bests = {t: max(model_eval[t].items(), key=lambda kv: kv[1]['Accuracy'])[0]
-             for t in targets if model_eval.get(t)}
-
-    trs = []
-    for name in MODEL_ORDER:
-        cells = []
-        for t in targets:
-            metrics = model_eval.get(t, {}).get(name)
-            if not metrics:
-                cells.append('<td>&mdash;</td>')
-                continue
-            acc = metrics['Accuracy'] * 100
-            value = f"<strong>{acc:.1f}%</strong>" if bests.get(t) == name else f"{acc:.1f}%"
-            cells.append(f'<td data-sort="{acc}">{value}</td>')
-        trs.append(f'<tr><td>{esc(name)}</td>{"".join(cells)}</tr>')
-    return table_html(['Model'] + targets, trs)
-
-
-def build_model_dashboard(kpis, model_eval):
-    os.makedirs('dashboards', exist_ok=True)
-    head = kpis['headline']
-
-    out = (read_asset('model_template.html')
-           .replace('/*__CSS__*/', read_asset('theme.css'))
-           .replace('/*__JS__*/', read_asset('interactions.js'))
-           .replace('__GENERATED__', kpis['generated_at'])
-           .replace('__TOTAL__', f"{head['total_bugs']:,}")
-           .replace('<!--__VERDICT_CATEGORY__-->', build_category_verdict(model_eval, head['total_bugs']))
-           .replace('<!--__VERDICT_SEVERITY__-->', build_severity_verdict(model_eval))
-           .replace('<!--__VERDICT_PRIORITY__-->', build_priority_verdict(model_eval))
-           .replace('<!--__COMPARISON_TABLE__-->', build_comparison_table(model_eval)))
-
-    with open(MODEL_PATH, 'w', encoding='utf-8') as f:
-        f.write(out)
-    return MODEL_PATH
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(
-        description="Build the Triage & Ops and Model reports, plus the KPI report")
+        description="Build the interactive dashboard, the KPI report and the companion charts")
     parser.add_argument('--no-open', dest='open_dashboard', action='store_false',
-                        help="Build the reports without opening one in the browser")
+                        help="Build without opening the dashboard in a browser")
+    parser.add_argument('--no-model', dest='use_models', action='store_false',
+                        help="Skip model scoring — faster, but the model view loses its predictions")
+    parser.add_argument('--sample', type=int, default=0,
+                        help="Embed only N rows in the page (0 = all). Shrinks the file for sharing.")
     parser.add_argument('--top', type=int, default=10,
                         help="How many rows the 'top N' console tables show")
-    parser.set_defaults(open_dashboard=True)
+    parser.set_defaults(open_dashboard=True, use_models=True)
     args = parser.parse_args()
 
     print("=" * 68)
-    print("  TASK 9: Dashboards & KPI Reporting")
+    print("  TASK 9: Interactive Dashboard & KPI Reporting")
     print("=" * 68)
 
     df, catalog, kb, model_eval = load_inputs()
@@ -1174,34 +1103,50 @@ def main():
     print(f"\n  Static companion charts:")
     charts = build_static_charts(df, kpis)
 
-    print(f"\n  Reports:")
-    ops_path = build_ops_dashboard(kpis, insights)
-    print(f"    Saved: {ops_path}  (Triage & Ops — for engineering managers/triage leads)")
+    # The embedded table can be trimmed for sharing; the KPIs above always
+    # cover the full dataset, so only the interactive slice shrinks.
+    embed = df
+    if args.sample and args.sample < len(df):
+        embed = df.sample(args.sample, random_state=42).sort_index()
+        print(f"\n  Embedding a {len(embed):,}-row sample "
+              f"(--sample {args.sample}); KPIs still cover all {len(df):,} rows.")
 
-    model_path = None
-    if model_eval:
-        model_path = build_model_dashboard(kpis, model_eval)
-        print(f"    Saved: {model_path}  (Model Report — for data-science reviewers)")
+    print(f"\n  Model pipeline:")
+    scores = None
+    if args.use_models:
+        scores = score_with_models(embed)
     else:
-        print(f"    Skipped Model Report — {MODEL_EVAL_PATH} not found.")
+        print(f"    Skipped (--no-model).")
+
+    print(f"\n  Interactive dashboard:")
+    payload = build_payload(embed, kpis, catalog, kb, model_eval, scores, origin, snapshot)
+    path, data_bytes = build_dashboard(payload)
+    size_mb = os.path.getsize(path) / (1024 * 1024)
+    print(f"    Embedded     : {len(embed):,} rows, {len(payload['cols'])} columns "
+          f"({data_bytes / (1024 * 1024):.2f} MB of encoded data)")
+    print(f"    Saved: {path}  ({size_mb:.2f} MB, fully self-contained)")
+
+    for legacy in LEGACY_PAGES:
+        if os.path.exists(legacy):
+            os.remove(legacy)
+            print(f"    Removed superseded page: {legacy}")
 
     print("\n" + "=" * 68)
     print("  DASHBOARD STAGE COMPLETE")
     print("=" * 68)
-    print(f"  Triage & Ops : {ops_path}")
-    if model_path:
-        print(f"  Model Report : {model_path}")
-    print(f"  KPI JSON     : {KPI_PATH}")
-    print(f"  Charts       : {len(charts)} PNGs in visualizations/")
+    print(f"  Dashboard : {path}")
+    print(f"  KPI JSON  : {KPI_PATH}")
+    print(f"  Charts    : {len(charts)} PNGs in visualizations/")
+    print(f"  Live mode : python src/09_serve.py   (adds model-backed triage)")
     print("=" * 68)
 
     if args.open_dashboard:
-        print("\n  Opening the Triage & Ops report in your browser...")
+        print("\n  Opening the dashboard in your browser...")
         try:
-            webbrowser.open(f"file:///{os.path.abspath(ops_path).replace(os.sep, '/')}")
-        except Exception as e:
+            webbrowser.open(f"file:///{os.path.abspath(path).replace(os.sep, '/')}")
+        except Exception as e:                                     # noqa: BLE001
             print(f"  [WARN] Could not open a browser automatically: {e}")
-            print(f"  Open this file manually: {os.path.abspath(ops_path)}")
+            print(f"  Open this file manually: {os.path.abspath(path)}")
         print("  (Run with --no-open to skip this.)")
 
     return 0
