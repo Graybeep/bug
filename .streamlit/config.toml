@@ -1,0 +1,66 @@
+# ==============================================================================
+# Streamlit theme for the Bug Management dashboard (src/streamlit_app.py).
+#
+# The colours are the project's own validated palette, carried over from the
+# retired HTML build: a categorical set that passes the lightness band, chroma
+# floor, adjacent-pair CVD separation, normal-vision floor and contrast-against-
+# surface checks in BOTH modes. Light is a deliberate second set, not an
+# inverted flip of dark.
+#
+# Status colours (good/warning/serious/critical) are reserved and live in
+# src/dashboard_ui.py — they are never reused as a series colour.
+# ==============================================================================
+
+[theme]
+base = "dark"
+font = "sans-serif"
+baseRadius = "medium"
+buttonRadius = "medium"
+showSidebarBorder = true
+
+# Streamlit accepts the chart palettes only at this top level, so these are the
+# dark steps. They cover Streamlit's own built-in charts; every chart the app
+# actually draws is Plotly, and src/dashboard_ui.py picks the dark or light
+# steps for it from the viewer's active theme.
+chartCategoricalColors = ["#3987e5", "#d95926", "#199e70", "#c98500",
+                          "#d55181", "#008300", "#9085e9", "#e66767"]
+chartSequentialColors = ["#cde2fb", "#b6d4f8", "#9ec5f4", "#6da7ec",
+                         "#3987e5", "#256abf", "#184f95", "#123f7c",
+                         "#0d366b", "#092a55"]
+
+[theme.dark]
+primaryColor = "#3987e5"
+backgroundColor = "#0d0d0d"
+secondaryBackgroundColor = "#1a1a19"
+textColor = "#ffffff"
+linkColor = "#6da7ec"
+borderColor = "#2c2c2a"
+dataframeBorderColor = "#2c2c2a"
+dataframeHeaderBackgroundColor = "#232322"
+
+[theme.dark.sidebar]
+backgroundColor = "#141413"
+secondaryBackgroundColor = "#232322"
+borderColor = "#2c2c2a"
+
+[theme.light]
+primaryColor = "#2a78d6"
+backgroundColor = "#f9f9f7"
+secondaryBackgroundColor = "#fcfcfb"
+textColor = "#0b0b0b"
+linkColor = "#256abf"
+borderColor = "#e1e0d9"
+dataframeBorderColor = "#e1e0d9"
+dataframeHeaderBackgroundColor = "#f2f1ed"
+
+[theme.light.sidebar]
+backgroundColor = "#f2f1ed"
+secondaryBackgroundColor = "#fcfcfb"
+borderColor = "#e1e0d9"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# The whole 50k-row table lives in one cached DataFrame; reruns are cheap.
+maxUploadSize = 5

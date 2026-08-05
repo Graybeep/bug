@@ -3,9 +3,12 @@
 # Runs the complete Bug Management pipeline (Tasks 1-9) in order, streaming each
 # stage's output to the console.
 #
-#   python run_pipeline.py                 # full pipeline, charts + dashboard open
+#   python run_pipeline.py                 # full pipeline, charts open
 #   python run_pipeline.py --no-open       # full pipeline, artifacts saved only
 #   python run_pipeline.py --skip-duplicates   # skip the slow similarity stage
+#
+# The interactive dashboard is not part of this run — it is a live app:
+#   python run_dashboard.py
 # ==============================================================================
 
 import subprocess
@@ -29,7 +32,7 @@ STAGES = [
     ('6',     'Training and Testing Models',          'src/05_modeling.py'),
     ('7',     'Severity & Priority Prediction',       'src/06_predict.py'),
     ('8',     'End-to-End Bug Triage & Tracking',     'src/07_bug_triage.py'),
-    ('9',     'Interactive Dashboard & KPI Reports',  'src/08_dashboard.py'),
+    ('9',     'KPI Reporting & Actionable Insights',  'src/08_dashboard.py'),
 ]
 
 
@@ -55,7 +58,7 @@ def run_stage(task, name, script, extra_args=None):
 def main():
     parser = argparse.ArgumentParser(description="Run the full Bug Management pipeline")
     parser.add_argument('--no-open', action='store_true',
-                        help="Do not open the charts (step 4) or the dashboard (step 9)")
+                        help="Do not open the charts window (step 4)")
     parser.add_argument('--skip-duplicates', action='store_true',
                         help="Skip step 5's similarity matrix (the slowest stage)")
     args = parser.parse_args()
@@ -80,13 +83,13 @@ def main():
             continue
 
         extra = []
-        if args.no_open and script.endswith(('03_visualization.py', '08_dashboard.py')):
+        if args.no_open and script.endswith('03_visualization.py'):
             extra = ['--no-open']
 
         # Stage 7's chart window is modal — it blocks until closed by hand, which
-        # would stall the pipeline before the dashboard stage ever runs. Its PNG
-        # is still written to visualizations/. Stages 3 and 8 open their output
-        # without blocking, so they keep their normal behaviour.
+        # would stall the pipeline before the KPI stage ever runs. Its PNG is
+        # still written to visualizations/. Stage 3 opens its output without
+        # blocking, so it keeps its normal behaviour.
         if script.endswith('07_bug_triage.py'):
             extra = ['--no-open']
 
@@ -102,16 +105,14 @@ def main():
         print(f"    [DONE] {name}")
     print(f"\n  Total runtime : {time.time() - overall:.1f}s")
     print(f"  Charts        : visualizations/")
-    print(f"  Dashboard     : dashboards/index.html")
     print(f"  Models        : models/")
     print(f"  Results       : data/model_evaluation_results.json")
     print(f"                  data/lifecycle_analysis.json")
     print(f"                  data/kpi_report.json")
-    print(f"\n  Live triage   : python src/09_serve.py")
-    print(f"                  serves the same dashboard with the trained models")
-    print(f"                  behind a local API, so the triage console predicts")
-    print(f"                  with best_priority_model.pkl instead of the")
-    print(f"                  documented fallback rule.")
+    print(f"\n  Dashboard     : python run_dashboard.py")
+    print(f"                  the interactive Streamlit views over these KPIs —")
+    print(f"                  six cross-filtered views plus a triage console that")
+    print(f"                  runs best_priority_model.pkl live, in-process.")
     print("=" * 70)
     return 0
 

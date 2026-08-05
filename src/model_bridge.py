@@ -3,9 +3,10 @@
 # The one place the dashboard talks to the trained models.
 #
 # Everything that needs a prediction goes through here:
-#   - 08_dashboard.py  scores the whole dataset at build time, so the dashboard
-#                      can show predicted-vs-recorded priority per split
-#   - 09_serve.py      answers /api/predict for the dashboard's triage console
+#   - 08_dashboard.py   scores the whole dataset for the console KPI report, so
+#                       it can report predicted-vs-recorded priority per split
+#   - streamlit_app.py  does the same thing interactively, and calls
+#                       predict_one() for the live triage console
 #
 # Keeping both on one code path means the console and the charts can never
 # disagree about how a feature vector is built.

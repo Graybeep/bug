@@ -8,5 +8,10 @@ matplotlib==3.11.1
 seaborn==0.13.2
 joblib==1.5.3
 
+# Interactive dashboard (Task 9) — src/streamlit_app.py, launched by
+# run_dashboard.py. The pipeline stages 1-8 do not need these.
+streamlit==1.57.0
+plotly==6.9.0
+
 # Optional — only needed by src/present_dataset.py (console summary tables)
 rich==15.0.0

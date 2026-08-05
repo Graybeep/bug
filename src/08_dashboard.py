@@ -1,43 +1,38 @@
 # ==============================================================================
 # 08_dashboard.py
-# Task 9: Interactive Dashboard, KPI Reporting & Actionable Insights
+# Task 9: KPI Reporting & Actionable Insights
 #
-# Builds ONE self-contained interactive dashboard over the bug records, keyed on
-# Bug ID, Sprint, Release Version, Module, Feature, Component, Priority,
-# Resolution, Root Cause and Date Closed — plus bug trends and resolution time.
+# Computes every KPI over the bug records — keyed on Bug ID, Sprint, Release
+# Version, Module, Feature, Component, Priority, Resolution, Root Cause and Date
+# Closed — and writes them out three ways: a printed report on the console, a
+# machine-readable data/kpi_report.json, and static companion charts.
 #
-# The whole bug table is embedded in the page as base64 typed arrays (one byte
-# per categorical value), so every filter, chart, KPI and table recomputes in
-# the browser from the same slice. No server and no CDN are needed to read it.
+# This is the reporting half of Task 9. The INTERACTIVE half is the Streamlit
+# app in src/streamlit_app.py, which imports prepare(), compute_kpis() and
+# build_insights() from this file by path, so the two can never disagree:
 #
-# The trained models are wired in twice:
-#   - at build time, model_bridge re-scores every bug with the saved priority
-#     model, and reproduces 05_modeling.py's train/test split so the dashboard
-#     can separate held-out agreement from memorised rows;
-#   - at run time, src/09_serve.py exposes the same models over a local API so
-#     the dashboard's triage console does live inference.
+#     python run_dashboard.py          # or: streamlit run src/streamlit_app.py
 #
-#   python src/08_dashboard.py              # build + open it
-#   python src/08_dashboard.py --no-open    # build only
+# The trained models are used here to report how the saved priority model
+# agrees with the recorded labels, split by 05_modeling.py's own train/test
+# partition; the app does the same thing interactively, plus live inference.
+#
+#   python src/08_dashboard.py              # KPI report + charts
 #   python src/08_dashboard.py --no-model   # skip model scoring (faster)
-#   python src/08_dashboard.py --sample 20000   # embed fewer rows (smaller file)
 #   python src/08_dashboard.py --top 15     # widen the console "top N" tables
 #
 # Input:  data/bug_reports_processed.csv  |  data/module_catalog.json
 #         data/bug_knowledge_base.json    |  data/model_evaluation_results.json
-#         models/*.pkl                    (optional — for prediction columns)
-# Output: dashboards/index.html           (the interactive dashboard, offline)
-#         data/kpi_report.json            (machine-readable KPIs)
+#         models/*.pkl                    (optional — for the agreement figures)
+# Output: data/kpi_report.json            (machine-readable KPIs)
 #         visualizations/kpi_*.png        (static companions)
 #         + the KPI report and actionable insights on the console
 # ==============================================================================
 
 import argparse
-import base64
 import json
 import os
 import sys
-import webbrowser
 from datetime import datetime
 
 import _deps
@@ -57,7 +52,7 @@ if sys.platform == "win32":
 # Resolve every relative path from the project root, so the script works the
 # same whether it is launched from the root, from src/, or from an IDE that
 # sets the working directory to the file's own folder. SRC_DIR is captured
-# before the chdir so the dashboard assets stay locatable afterwards.
+# before the chdir so model_bridge stays importable afterwards.
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(os.path.dirname(SRC_DIR))
 sys.path.insert(0, SRC_DIR)
@@ -69,16 +64,11 @@ CATALOG_PATH    = 'data/module_catalog.json'
 KB_PATH         = 'data/bug_knowledge_base.json'
 MODEL_EVAL_PATH = 'data/model_evaluation_results.json'
 KPI_PATH        = 'data/kpi_report.json'
-DASHBOARD_PATH  = 'dashboards/index.html'
 
-# Superseded by the single interactive dashboard; removed on build so a stale
-# copy can't be opened by mistake from an old bookmark.
-LEGACY_PAGES = ['dashboards/ops_dashboard.html', 'dashboards/model_report.html']
-
-# Fixed model -> categorical color slot, so a model keeps its identity across
-# every chart rather than being recolored per target.
-MODEL_ORDER = ['Naive Bayes', 'Logistic Regression', 'Decision Tree',
-               'Random Forest', 'SVM (Linear)']
+# Superseded by the Streamlit app; removed on each run so a stale generated page
+# can't be opened by mistake from an old bookmark and read as current.
+LEGACY_PAGES = ['dashboards/index.html', 'dashboards/ops_dashboard.html',
+                'dashboards/model_report.html']
 
 # Mirrors 01_data_collection.py — kept here so the KPI stage can be re-run
 # against an older enriched CSV without silently changing the definitions.
@@ -92,7 +82,6 @@ STATUS_ORDER     = ['New', 'Assigned', 'In Progress', 'Fixed', 'Pending Retest',
                     'Verified', 'Closed', 'Reopened', 'Duplicate', 'Rejected', 'Deferred']
 LIFECYCLE_ORDER  = ['Reported', 'In Progress', 'Resolved', 'Verification', 'Closed']
 RESOLUTION_ORDER = ['Fixed', 'Unresolved', 'Duplicate', 'Invalid', "Won't Fix"]
-ENVIRONMENT_ORDER = ['Development', 'Staging', 'Production']
 
 RULE = "-" * 68
 
@@ -137,7 +126,7 @@ def load_inputs():
             model_eval = json.load(f)
     else:
         print(f"  [WARN] '{MODEL_EVAL_PATH}' not found — run 'python src/05_modeling.py' "
-              f"first; the model verdicts will be skipped.")
+              f"first; the dashboard's model comparison needs it.")
 
     return df, catalog, kb, model_eval
 
@@ -635,254 +624,6 @@ def score_with_models(df):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  Embedded payload
-#
-#  The browser gets one byte per categorical value per bug, base64'd. 50k rows
-#  across ~20 columns is about 1 MB of binary — small enough to inline, and it
-#  buys genuine cross-filtering: every recompute is a single linear scan over
-#  typed arrays rather than a round trip to a server that isn't there.
-# ──────────────────────────────────────────────────────────────────────────────
-def enc_u8(values):
-    return base64.b64encode(np.asarray(values, dtype=np.uint8).tobytes()).decode('ascii')
-
-
-def enc_u16(values):
-    return base64.b64encode(np.asarray(values, dtype='<u2').tobytes()).decode('ascii')
-
-
-def enc_i16(values):
-    return base64.b64encode(np.asarray(values, dtype='<i2').tobytes()).decode('ascii')
-
-
-def enc_u32(values):
-    return base64.b64encode(np.asarray(values, dtype='<u4').tobytes()).decode('ascii')
-
-
-def codes(series, order):
-    """Categorical codes against a fixed level order.
-
-    Unknown/missing values fall back to level 0 rather than -1: a negative code
-    would index past the front of the JS label array and render as 'undefined'.
-    """
-    cat = pd.Categorical(series.astype(str), categories=[str(v) for v in order])
-    arr = cat.codes.astype(np.int16)
-    if (arr < 0).any():
-        arr = np.where(arr < 0, 0, arr)
-    return arr.astype(np.uint8)
-
-
-def levels(series, preferred=None):
-    """Fixed level order for one column: preferred first, then the rest sorted."""
-    present = sorted({str(v) for v in series.dropna().unique()})
-    if not preferred:
-        return present
-    ordered = [str(v) for v in preferred if str(v) in present]
-    return ordered + [v for v in present if v not in ordered]
-
-
-VERDICTS = [
-    {
-        'target': 'Bug Category',
-        'status': 'critical',
-        'label': 'Leakage, not a result',
-        'narrative': [
-            'Every model scores near-perfect accuracy on Bug Category — and that is not generalization. ',
-            {'code': 'title'}, ', ', {'code': 'description'}, ', ', {'code': 'root_cause'}, ' and ',
-            {'code': 'suggested_fix'},
-            ' are boilerplate templates: only 16 unique strings across the whole dataset, one fixed '
-            'template per category, so the model is matching a copied template back to the label it was '
-            'copied from. Treat this target as unlearnable until the source data carries genuine free text.',
-        ],
-    },
-    {
-        'target': 'Severity',
-        'status': 'critical',
-        'label': 'No predictive signal',
-        'narrative': [
-            'Every model lands at chance level for four classes (~25%). Severity was tested against '
-            'bug_category, bug_domain, environment, error_code, developer_role and the description text '
-            'itself: none carries usable signal, and every split lands within a point or two of uniform. '
-            'Severity appears to be assigned independently at random in the source data — ',
-            {'strong': 'no model can beat chance on it from this dataset'},
-            ', text-based or feature-based.',
-        ],
-    },
-    {
-        'target': 'Priority',
-        'status': 'good',
-        'label': 'Learnable — with a caveat',
-        'narrative': [
-            'Unlike the other two targets, the five models genuinely spread out here, and Random Forest '
-            'separates from the rest — a real, learnable relationship. The caveat: priority is a ',
-            {'strong': 'derived field'},
-            ', computed from the structured features by a documented scoring rule plus ~8% seeded jitter, '
-            'so the models recover that rule rather than predicting real-world triage priority. Read it as '
-            'proof the pipeline trains and ranks models correctly on a learnable target — not as evidence '
-            'priority is predictable from the raw Kaggle data, which has no priority field at all.',
-        ],
-    },
-]
-
-
-def build_payload(df, kpis, catalog, kb, model_eval, scores, origin, snapshot):
-    targets = sla_targets(catalog)
-    kloc    = module_kloc(catalog, df)
-
-    dim_specs = [
-        ('module',      'module',          None),
-        ('feature',     'feature',         None),
-        ('component',   'component',       None),
-        ('priority',    'priority',        PRIORITY_ORDER),
-        ('severity',    'severity',        SEVERITY_ORDER),
-        ('status',      'status',          STATUS_ORDER),
-        ('resolution',  'resolution',      RESOLUTION_ORDER),
-        ('sprint',      'sprint',          None),
-        ('release',     'release_version', None),
-        ('category',    'bug_category',    None),
-        ('domain',      'bug_domain',      None),
-        ('environment', 'environment',     ENVIRONMENT_ORDER),
-        ('tech',        'tech_stack',      None),
-        ('errorCode',   'error_code',      None),
-        ('team',        'assigned_team',   None),
-        ('lifecycle',   'lifecycle_stage', LIFECYCLE_ORDER),
-        ('month',       'month',           None),
-    ]
-
-    dims, cols = {}, {}
-    for name, column, preferred in dim_specs:
-        if column == 'error_code':
-            series = df[column].fillna(0).astype(float).astype(int).astype(str)
-        else:
-            series = df[column].astype(str)
-        order = levels(series, preferred)
-        dims[name] = order
-        cols[name] = enc_u8(codes(series, order))
-
-    # Closure position: which sprint / month the bug actually closed in.
-    close_sprint = (df['close_sprint_index'].fillna(0).astype(int)
-                    .clip(0, len(dims['sprint']) - 1))
-    cols['closeSprint'] = enc_u8(close_sprint)
-
-    month_index = {label: i for i, label in enumerate(dims['month'])}
-    close_month = df['close_month'].map(month_index).fillna(255).astype(int).clip(0, 255)
-    cols['closeMonth'] = enc_u8(close_month)
-
-    # Predictions. Absent models leave the columns flat and modelScored false,
-    # so the model view can say so rather than showing a fake diagonal.
-    if scores is not None:
-        pri_index = {label: i for i, label in enumerate(dims['priority'])}
-        cols['predPriority'] = enc_u8(pd.Series(scores['labels']).map(pri_index).fillna(0).astype(int))
-        conf = np.nan_to_num(scores['confidence'], nan=0.0)
-        cols['predConf'] = enc_u8(np.clip(np.round(conf * 100), 0, 100).astype(int))
-        cols['split'] = enc_u8(scores['split'])
-    else:
-        zeros = np.zeros(len(df), dtype=np.uint8)
-        cols['predPriority'] = enc_u8(zeros)
-        cols['predConf'] = enc_u8(zeros)
-        cols['split'] = enc_u8(zeros)
-
-    res_days = df['resolution_days'].fillna(-1).astype(float).clip(-1, 32000).astype(int)
-
-    # Bug IDs are BUG_nnnnnn. When they run 1..N in row order — which they do
-    # for an untouched pipeline — the page rebuilds them from the row index
-    # instead of carrying a 200 KB id column.
-    numeric_ids = (df['bug_id'].astype(str).str.extract(r'(\d+)')[0]
-                   .astype('Int64').fillna(0).astype(int).to_numpy())
-    sequential = bool(np.array_equal(numeric_ids, np.arange(1, len(df) + 1)))
-    ids = {'seq': True} if sequential else {'seq': False, 'data': enc_u32(numeric_ids)}
-
-    # Per-category lookups: 16 templates for the whole dataset, so the page
-    # stores 16 strings and an index rather than 50,000 repeated ones.
-    def by_category(field, kb_key):
-        out = []
-        for cat in dims['category']:
-            entry = (kb or {}).get(cat, {})
-            value = entry.get(kb_key)
-            if not value:
-                sub = df.loc[df['bug_category'].astype(str) == cat, field]
-                value = str(sub.iloc[0]) if len(sub) else cat
-            out.append(str(value))
-        return out
-
-    routing = {cat: (kb or {}).get(cat, {}).get('assigned_role', 'Full-Stack Developer')
-               for cat in dims['category']}
-
-    payload = {
-        'meta': {
-            'generated':  kpis['generated_at'],
-            'snapshot':   kpis['headline']['snapshot_date'],
-            'origin':     origin.strftime('%Y-%m-%d'),
-            'originMs':   int(pd.Timestamp(origin).timestamp() * 1000),
-            'snapshotDay': int((snapshot - origin).days),
-            'rows':       int(len(df)),
-            'sprintDays': SPRINT_LENGTH_DAYS,
-            # The reporting window starts and ends mid-month, so the first and
-            # last points of a monthly series cover fewer days than the rest.
-            # Flagged rather than dropped, so the chart can say why they dip.
-            'monthFirstPartial': bool(pd.Timestamp(origin).day > 1),
-            'monthLastPartial':  bool(pd.Timestamp(snapshot).day
-                                      < pd.Timestamp(snapshot).days_in_month),
-            'monthFirst': dims['month'][0] if dims['month'] else None,
-            'monthLast':  dims['month'][-1] if dims['month'] else None,
-            'modelScored': scores is not None,
-            'modelName':  scores['model_name'] if scores else None,
-            'agreementAll':  scores['agreement_all'] if scores else None,
-            'agreementTest': scores['agreement_test'] if scores else None,
-        },
-        'dims': dims,
-        'cols': cols,
-        'u16':  {'createdDay': enc_u16(df['created_day'].clip(0, 65535))},
-        'i16':  {'resDays': enc_i16(res_days)},
-        'ids':  ids,
-        'lookups': {
-            'slaByPriority':       [int(targets.get(p, 30)) for p in dims['priority']],
-            'klocByModule':        [round(float(kloc.get(m, 1.0)), 1) for m in dims['module']],
-            'rootCauseByCategory': by_category('root_cause', 'root_cause'),
-            'fixByCategory':       by_category('suggested_fix', 'suggested_fix'),
-            'titleByCategory':     by_category('title', 'sample_title'),
-        },
-        'kpis':      kpis,
-        'insights':  kpis['insights'],
-        'modelEval': model_eval,
-        'modelOrder': MODEL_ORDER,
-        'verdicts':  [v for v in VERDICTS if model_eval.get(v['target'])],
-        'routing':   {'by_category': routing, 'domain_override': DOMAIN_OVERRIDE},
-        'priorityNote': model_bridge.PRIORITY_NOTE,
-        'severityNote': model_bridge.SEVERITY_NOTE,
-    }
-    return payload
-
-
-def read_asset(name):
-    """Load one of the front-end files that get inlined into the dashboard."""
-    path = os.path.join(SRC_DIR, 'dashboard', name)
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"Dashboard asset '{name}' not found at {path}. The src/dashboard/ "
-            f"folder ships index_template.html, theme.css and app.js.")
-    with open(path, encoding='utf-8') as f:
-        return f.read()
-
-
-def build_dashboard(payload):
-    os.makedirs('dashboards', exist_ok=True)
-
-    # '<' is escaped so a label can never terminate the <script> block early.
-    data = json.dumps(payload, separators=(',', ':'), allow_nan=False).replace('<', '\\u003c')
-
-    html = (read_asset('index_template.html')
-            .replace('/*__CSS__*/', read_asset('theme.css'))
-            .replace('/*__JS__*/', read_asset('app.js'))
-            .replace('__SNAPSHOT__', payload['meta']['snapshot'])
-            .replace('__TOTAL__', f"{payload['meta']['rows']:,}")
-            .replace('__DATA__', data))
-
-    with open(DASHBOARD_PATH, 'w', encoding='utf-8') as f:
-        f.write(html)
-    return DASHBOARD_PATH, len(data)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 #  Static companion charts (the printable/report versions)
 # ──────────────────────────────────────────────────────────────────────────────
 def save_fig(fig, name):
@@ -1055,20 +796,16 @@ def build_static_charts(df, kpis):
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(
-        description="Build the interactive dashboard, the KPI report and the companion charts")
-    parser.add_argument('--no-open', dest='open_dashboard', action='store_false',
-                        help="Build without opening the dashboard in a browser")
+        description="Compute the KPI report, the actionable insights and the companion charts")
     parser.add_argument('--no-model', dest='use_models', action='store_false',
-                        help="Skip model scoring — faster, but the model view loses its predictions")
-    parser.add_argument('--sample', type=int, default=0,
-                        help="Embed only N rows in the page (0 = all). Shrinks the file for sharing.")
+                        help="Skip model scoring — faster, but the agreement figures are skipped")
     parser.add_argument('--top', type=int, default=10,
                         help="How many rows the 'top N' console tables show")
-    parser.set_defaults(open_dashboard=True, use_models=True)
+    parser.set_defaults(use_models=True)
     args = parser.parse_args()
 
     print("=" * 68)
-    print("  TASK 9: Interactive Dashboard & KPI Reporting")
+    print("  TASK 9: KPI Reporting & Actionable Insights")
     print("=" * 68)
 
     df, catalog, kb, model_eval = load_inputs()
@@ -1103,51 +840,26 @@ def main():
     print(f"\n  Static companion charts:")
     charts = build_static_charts(df, kpis)
 
-    # The embedded table can be trimmed for sharing; the KPIs above always
-    # cover the full dataset, so only the interactive slice shrinks.
-    embed = df
-    if args.sample and args.sample < len(df):
-        embed = df.sample(args.sample, random_state=42).sort_index()
-        print(f"\n  Embedding a {len(embed):,}-row sample "
-              f"(--sample {args.sample}); KPIs still cover all {len(df):,} rows.")
-
     print(f"\n  Model pipeline:")
-    scores = None
     if args.use_models:
-        scores = score_with_models(embed)
+        score_with_models(df)
     else:
         print(f"    Skipped (--no-model).")
-
-    print(f"\n  Interactive dashboard:")
-    payload = build_payload(embed, kpis, catalog, kb, model_eval, scores, origin, snapshot)
-    path, data_bytes = build_dashboard(payload)
-    size_mb = os.path.getsize(path) / (1024 * 1024)
-    print(f"    Embedded     : {len(embed):,} rows, {len(payload['cols'])} columns "
-          f"({data_bytes / (1024 * 1024):.2f} MB of encoded data)")
-    print(f"    Saved: {path}  ({size_mb:.2f} MB, fully self-contained)")
 
     for legacy in LEGACY_PAGES:
         if os.path.exists(legacy):
             os.remove(legacy)
-            print(f"    Removed superseded page: {legacy}")
+            print(f"\n  Removed superseded generated page: {legacy}")
 
     print("\n" + "=" * 68)
-    print("  DASHBOARD STAGE COMPLETE")
+    print("  KPI STAGE COMPLETE")
     print("=" * 68)
-    print(f"  Dashboard : {path}")
     print(f"  KPI JSON  : {KPI_PATH}")
     print(f"  Charts    : {len(charts)} PNGs in visualizations/")
-    print(f"  Live mode : python src/09_serve.py   (adds model-backed triage)")
+    print(f"  Dashboard : python run_dashboard.py")
+    print(f"              the interactive views over these same KPIs, plus a")
+    print(f"              triage console that runs the trained models live")
     print("=" * 68)
-
-    if args.open_dashboard:
-        print("\n  Opening the dashboard in your browser...")
-        try:
-            webbrowser.open(f"file:///{os.path.abspath(path).replace(os.sep, '/')}")
-        except Exception as e:                                     # noqa: BLE001
-            print(f"  [WARN] Could not open a browser automatically: {e}")
-            print(f"  Open this file manually: {os.path.abspath(path)}")
-        print("  (Run with --no-open to skip this.)")
 
     return 0
 

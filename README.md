@@ -42,8 +42,6 @@ BugManagement/
 │   ├── kpi_report.json                # All KPIs + insights, machine-readable (created by 08)
 │   ├── tracked_bugs.json              # Live ticket tracker (created by 07)
 │   └── model_evaluation_results.json  # ML model metrics
-├── dashboards/
-│   └── index.html                     # THE interactive dashboard (created by 08) — 6 views, offline
 ├── models/
 │   ├── label_encoders.pkl             # Fitted label encoders
 │   ├── tfidf_vectorizer.pkl           # TF-IDF vectorizer
@@ -60,13 +58,11 @@ BugManagement/
 │   ├── 05_modeling.py                 # Task 6: Train & evaluate 5 ML models per target
 │   ├── 06_predict.py                  # Task 7: Predict severity & priority
 │   ├── 07_bug_triage.py               # Task 8: Full triage — assign, diagnose, track
-│   ├── 08_dashboard.py                # Task 9: Interactive dashboard + KPI report
-│   ├── 09_serve.py                    # Optional: serve the dashboard with LIVE model inference
+│   ├── 08_dashboard.py                # Task 9: KPI report, insights + companion charts
+│   ├── streamlit_app.py               # Task 9: THE interactive dashboard — 6 views, live models
+│   ├── dashboard_data.py              #   its data layer: cached load, filter, KPI, model calls
+│   ├── dashboard_ui.py                #   its look: palette, Plotly template, CSS, components
 │   ├── model_bridge.py                # The one code path from the dashboard to models/*.pkl
-│   ├── dashboard/                     # Front-end assets inlined into the HTML by 08
-│   │   ├── index_template.html        #   single-page app shell
-│   │   ├── theme.css                  #   dark-first theme (light ink) + light mode
-│   │   └── app.js                     #   filter engine, SVG charts, views, triage console
 │   ├── _deps.py                       # Dependency guard (clear message if venv not active)
 │   └── present_dataset.py             # Optional: rich console summary of the dataset
 ├── visualizations/
@@ -88,7 +84,10 @@ BugManagement/
 ├── docs/
 │   ├── PROJECT_REPORT.md              # Full write-up: method, results, limitations
 │   └── PROJECT_REPORT.pdf             # Same report, rendered with charts embedded
+├── .streamlit/
+│   └── config.toml                    # Dashboard theme (validated palette, dark + light)
 ├── run_pipeline.py                    # Runs all 9 tasks in order
+├── run_dashboard.py                   # Launches the interactive dashboard
 ├── requirements.txt
 └── README.md
 ```
@@ -125,13 +124,19 @@ pip install -r requirements.txt
 python run_pipeline.py
 ```
 
-Runs all 9 tasks in order, streams each stage's output to the console, opens the 9 charts at Task 4, and opens the interactive dashboard in your browser at Task 9.
+Runs all 9 tasks in order, streams each stage's output to the console, and opens the 9 charts at Task 4.
 
 Task 9 additionally re-scores all 50,000 bugs with the trained priority model, so allow ~1 minute for that stage (`python src/08_dashboard.py --no-model` skips it).
 
 ```bash
-python run_pipeline.py --no-open           # save charts + dashboard without opening them
+python run_pipeline.py --no-open           # save the charts without opening them
 python run_pipeline.py --skip-duplicates   # skip Task 5 — finishes in ~40s
+```
+
+Then start the interactive dashboard — it is a live app, not a build artifact, so it is not part of the pipeline run:
+
+```bash
+python run_dashboard.py                    # http://localhost:8501
 ```
 
 ### Option B — Step-by-step Execution
@@ -161,11 +166,13 @@ python src/07_bug_triage.py --title "Checkout page crashes" \
        --desc "Payment page freezes after submit" \
        --error-code 500 --category "Backend Logic Bug" --environment Production
 
-# Step 9: Build the interactive dashboard + KPI report and open it in the browser
-python src/08_dashboard.py              # add --no-open to only build it
+# Step 9: KPI report + actionable insights + the 5 companion charts
+python src/08_dashboard.py              # add --no-model to skip model scoring
 
-# Optional: serve that same dashboard with LIVE model inference in its triage console
-python src/09_serve.py                  # http://127.0.0.1:8000
+# Step 9 (interactive): the dashboard — 6 cross-filtered views + live triage console
+python run_dashboard.py                 # http://localhost:8501
+python run_dashboard.py --port 8600     # different port
+python run_dashboard.py --no-open       # start the server without opening a browser
 ```
 
 > **Working directory doesn't matter.** Every script resolves its paths from the project root, so you can launch them from the project root, from inside `src/`, from an IDE's Run button, or from anywhere else — they'll always find `data/` and `models/`.
@@ -181,8 +188,8 @@ python src/09_serve.py                  # http://127.0.0.1:8000
 | `05` | Per-target metrics table (5 models × Accuracy/Precision/Recall/F1), best model per target, per-class classification report |
 | `06` | Input description + context, predicted **Severity** and **Priority** with triage notes |
 | `07` | 5-step triage report: reported details → cleaning → Random Forest prediction → developer assignment + root cause + suggested fix → life cycle tracking. Pops up the assignment chart; pass `--no-open` to only save it |
-| `08` | **KPI report** in six blocks (headline KPIs, module-wise quality, priority vs SLA, team performance, release-wise quality, top root causes), then **seven actionable insights**, then the model-scoring log (rows scored, train/test split recovered, agreement) and the build log for the dashboard, KPI JSON and 5 charts |
-| `09` | Server banner: dashboard size, knowledge-base size, which models loaded, and the URLs for the page and the two API endpoints |
+| `08` | **KPI report** in six blocks (headline KPIs, module-wise quality, priority vs SLA, team performance, release-wise quality, top root causes), then **seven actionable insights**, then the model-scoring log (rows scored, train/test split recovered, agreement) and the save log for the KPI JSON and 5 charts |
+| `run_dashboard.py` | Which inputs were found, which are missing and how to produce them, then the Streamlit server banner and URL |
 
 ---
 
@@ -198,8 +205,8 @@ python src/09_serve.py                  # http://127.0.0.1:8000
 | 6 | Model Training & Testing | `05_modeling.py` | 5 models × 3 targets, best saved |
 | 7 | Severity & Priority Prediction | `06_predict.py` | Console prediction output |
 | 8 | End-to-End Triage & Tracking | `07_bug_triage.py` | `data/tracked_bugs.json`, lifecycle chart |
-| 9 | Interactive Dashboard & KPI Reporting | `08_dashboard.py` | `dashboards/index.html`, `data/kpi_report.json`, 5 KPI charts |
-| 9+ | Live model serving (optional) | `09_serve.py` | Same dashboard + `/api/predict` backed by `models/*.pkl` |
+| 9 | KPI Reporting & Actionable Insights | `08_dashboard.py` | `data/kpi_report.json`, 5 KPI charts, printed report |
+| 9 | Interactive Dashboard | `streamlit_app.py` (`run_dashboard.py`) | 6 cross-filtered views + a triage console running `models/*.pkl` live |
 
 ---
 
@@ -372,40 +379,50 @@ All charts are saved to the `visualizations/` folder **and opened in your defaul
 
 ---
 
-## 📊 Interactive Dashboard & KPI Reporting (`08_dashboard.py`)
+## 📊 Interactive Dashboard & KPI Reporting (Task 9)
 
-Stage 9 turns the bug records into **one interactive dashboard** — `dashboards/index.html` — plus a machine-readable **KPI report** and a set of **actionable insights**. It is a single self-contained HTML file: no server, no CDN, no network access. Open it by double-clicking.
+Stage 9 has two halves, and they share one set of definitions.
+
+| Half | Script | What you get |
+|------|--------|--------------|
+| **Reporting** | `src/08_dashboard.py` | The KPI report printed to the console, `data/kpi_report.json`, and 5 static companion charts |
+| **Interactive** | `src/streamlit_app.py`, launched by `run_dashboard.py` | Six cross-filtered views in the browser, plus a triage console that runs the trained models live |
 
 ```bash
-python src/08_dashboard.py                # build it and open it
-python src/08_dashboard.py --no-open      # build only
-python src/08_dashboard.py --no-model     # skip model scoring (faster build)
-python src/08_dashboard.py --sample 20000 # embed fewer rows — smaller file for sharing
+python src/08_dashboard.py                # KPI report + insights + companion charts
+python src/08_dashboard.py --no-model     # skip model scoring (faster)
 python src/08_dashboard.py --top 15       # widen the "top N root causes" console table
+
+python run_dashboard.py                   # the dashboard, on http://localhost:8501
+python run_dashboard.py --port 8600       # different port
+python run_dashboard.py --no-open         # start the server without opening a browser
+streamlit run src/streamlit_app.py        # the same app, without the input pre-flight check
 ```
 
-### How it can be interactive with no server
+`run_dashboard.py` checks the inputs first, so a missing pipeline artifact gets you the command that produces it rather than a stack trace.
 
-The whole bug table is embedded in the page as **base64-encoded typed arrays** — one byte per categorical value, per bug. 50,000 rows across 22 columns is ~1.7 MB of encoded data, giving a ~1.8 MB self-contained page.
+### One definition of every KPI
 
-Every filter change runs **one linear pass** over those arrays and rebuilds every KPI, chart and table on the active view from the same slice. That is why the numbers always agree with each other and with the filter chips — there is exactly one aggregation, not one per widget.
+The app does **not** restate the KPI formulas. `src/dashboard_data.py` imports `prepare()`, `compute_kpis()` and `build_insights()` out of `08_dashboard.py` by path (its filename starts with a digit, so a normal `import` cannot reach it) and calls them on whatever slice the filters select. The console report and the dashboard therefore cannot drift apart: there is exactly one implementation, and the app just feeds it a different frame.
 
-### The filter bar scopes everything below it
+### The filters scope everything
 
-One row, above the content: **Module · Priority · Severity · Status · Release · Owner · Bug state (all/open/closed) · Sprint range**. Active filters appear as removable chips, and clicking any bar, heat cell or table row adds that value as a filter too. `Reset all filters` clears the lot.
+The sidebar carries **Bug state · Reported within · Module · Priority · Severity**, with Sprint, Release, Category, Environment and Routed owner under *More filters*. Every view — tiles, charts, tables, model agreement, explorer — recomputes from the same filtered slice, and each page says how many of the 50,000 records are in scope. `Reset filters` clears the lot.
+
+The filtered slice and its KPIs are cached on the filter values themselves, so switching views with the same filters is instant and only a filter change pays for a recompute.
 
 ### The six views
 
 | View | Shows |
 |------|-------|
-| **Overview** | 8 stat tiles with sparklines (bugs in scope, open, SLA compliance, avg resolution time, defect density, reopen rate, open backlog, avg open age), sprint intake vs closure, carried-over backlog, the priority/severity/status mix, and the 7 ranked insights |
-| **Trends & resolution** | Bug reporting trend by month (reported vs closed), resolution-time trend by sprint, days-to-close distribution, open-queue age profile, avg/median resolution time against each priority's SLA target, and SLA compliance meters |
-| **Distribution** | Bugs by module, release-wise closed/open, Module × Priority heatmap, defect density by module, and bugs by feature, component, environment, domain and resolution outcome |
-| **Quality & team** | Recurring root causes, bug categories, team workload by routed owner, and release risk ranked by unresolved P1/P2 |
-| **Models & triage** | The 3 model verdicts, recorded × predicted priority confusion heatmap **per data split**, prediction-confidence distribution, model-flagged escalations, and the live triage console |
-| **Bug explorer** | Every record behind the charts — searchable, sortable on any of 15 columns, paginated, with CSV export of the current slice |
+| **Overview** | 8 stat tiles (bugs in scope, open, SLA compliance, avg resolution time, defect density, reopen rate, avg open age, carried backlog), sprint intake vs closure, the backlog it leaves behind, the priority mix, how far past SLA the open work is, and the 7 ranked insights |
+| **Trends** | Reported vs closed by month, net backlog change per month, the days-to-close distribution, median days against each priority's SLA target, SLA compliance per band, and the spread of resolution time by priority |
+| **Distribution** | Any dimension in the taxonomy (module, feature, component, category, domain, tech stack, environment, status, lifecycle, resolution) as open-vs-closed bars plus a share ring, the Module × Priority heatmap, the severity mix per sprint, and bugs per release |
+| **Quality & team** | Defect density per module against module size, the top root causes, queue length and SLA compliance per routed owner, and release risk ranked by unresolved P1/P2 |
+| **Models & triage** | The five models across four metrics per target with the verdict for each, the recorded × predicted priority confusion matrix **per data split**, the most confident disagreements, and the live triage console |
+| **Bug explorer** | Every record behind the charts — search across ID/title/description, pick your columns, sort on any of them, export the slice as CSV, and open one bug in full |
 
-**Every chart has a table-view twin** (the `Chart` / `Table` toggle on each card), so no value is only reachable by hovering. Tables sort on any column; series legends toggle.
+**Every chart has a table view** behind a *Show the numbers* expander, so no value is reachable only by hovering.
 
 ### Model verdicts
 
@@ -417,7 +434,7 @@ One row, above the content: **Module · Priority · Severity · Status · Releas
 
 ### Theming
 
-Dark is the default surface, so every ink role is a light value (`#ffffff` primary, `#c3c2b7` secondary on a `#1a1a19` chart surface). Light mode is a **separate selected set**, not an inverted flip, and the header toggle persists the choice. The 8 categorical hues pass the lightness band, chroma floor, adjacent-CVD separation (worst ΔE 8.4), normal-vision floor (worst ΔE 19.3) and ≥3:1 contrast against the dark surface. Status colors (good/warning/serious/critical) are reserved and always ship with an icon **and** a label, never color alone.
+`.streamlit/config.toml` carries the project palette for both modes; switch with Streamlit's own theme control (☰ → Settings). Dark is the default surface, so every ink role is a light value (`#ffffff` primary, `#c3c2b7` secondary on a `#1a1a19` chart surface). Light is a **separate selected set**, not an inverted flip. The 8 categorical hues pass the lightness band, chroma floor, adjacent-CVD separation (worst ΔE 8.4), normal-vision floor (worst ΔE 19.3) and ≥3:1 contrast against the dark surface. Categorical hues are assigned in fixed order — P1 keeps its colour when a filter drops P3 — sequential heat is one hue light→dark, and status colours (good/warning/serious/critical) are reserved, never reused as a series colour, and always carry a word as well as a colour.
 
 ### KPIs computed
 
@@ -441,11 +458,11 @@ The dataset's own `developer_role` column is **uniformly random** — every role
 
 ## 🔌 How the dashboard connects to the models
 
-`src/model_bridge.py` is the single code path from the dashboard to `models/*.pkl`. Both halves of the pipeline go through it, so the charts and the triage console can never disagree about how a feature vector is built.
+`src/model_bridge.py` is the single code path from the dashboard to `models/*.pkl`. Both halves of stage 9 go through it, so the charts and the triage console can never disagree about how a feature vector is built.
 
-### Build time — every bug is re-scored
+### Scoring the dataset
 
-`08_dashboard.py` loads `best_priority_model.pkl` + `tfidf_vectorizer.pkl` + `priority_features.pkl` and re-scores all 50,000 rows in chunks, embedding the predicted priority and the model's own confidence as two more columns in the page.
+`08_dashboard.py` — and, on demand, the *Models & triage* view — loads `best_priority_model.pkl` + `tfidf_vectorizer.pkl` + `priority_features.pkl` and re-scores all 50,000 rows in chunks, keeping the predicted priority and the model's own confidence per row.
 
 It also **reproduces `05_modeling.py`'s train/test partition exactly** — the same `sample(20000, random_state=42)` followed by the same stratified `train_test_split(test_size=0.2, random_state=42)` — and tags every row `training` / `held-out test` / `never sampled`. That is what makes the *Models & triage* view honest: the split selector separates memorised rows from held-out ones.
 
@@ -456,36 +473,15 @@ Agreement    : 86.9% over all rows, 80.8% on the held-out test rows
 
 The **80.8% held-out figure reproduces `05_modeling.py`'s reported Random Forest priority accuracy (0.8077) exactly**, which is the check that the split reconstruction is right rather than approximately right.
 
-### Run time — the triage console
+In the app, scoring sits behind a button on the *Agreement* tab: the priority model is ~110 MB, so it is loaded lazily and the result is cached for the session.
 
-The console on the *Models & triage* view takes the same inputs `07_bug_triage.py` takes on the command line and returns the predicted priority with its **full class-probability vector**, the routed owner, the root cause and the suggested fix.
+### The live triage console
 
-| Mode | When | What runs |
-|------|------|-----------|
-| **Offline** | The page was opened as a file | The documented priority scoring rule (severity + environment + blocking error code) and the routing table, both embedded in the page |
-| **Live** | The page is served by `09_serve.py` | Real inference against `best_priority_model.pkl` and `best_severity_model.pkl` over `POST /api/predict` |
+The console on the *Models & triage* view takes the same inputs `07_bug_triage.py` takes on the command line and returns the predicted priority with its **full class-probability vector**, plus the routed owner and suggested fix from the knowledge base.
 
-The header badge says which mode you are in; the console degrades to the rule and says so if a live call fails.
+It calls `model_bridge.predict_one()` **in-process** — Streamlit is already the server, so there is no API hop, no fallback rule, and no offline mode to explain. If `models/*.pkl` cannot be loaded, the console says exactly which file is missing and which script produces it.
 
-```bash
-python src/09_serve.py                 # http://127.0.0.1:8000
-python src/09_serve.py --port 8080     # different port
-python src/09_serve.py --no-open       # don't open a browser
-```
-
-`09_serve.py` uses only the standard library's `http.server` — **no Flask, no new dependency**. It binds to loopback and is meant for your own machine: single process, no auth, no TLS.
-
-| Endpoint | Returns |
-|---|---|
-| `GET /` | `dashboards/index.html` |
-| `GET /api/health` | `{"models_loaded": true, "priority_model": "RandomForestClassifier", ...}` |
-| `POST /api/predict` | severity, priority, per-class probabilities, routed owner, root cause, suggested fix |
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/predict -H "Content-Type: application/json" \
-  -d '{"title":"Checkout crashes","desc":"Payment page freezes after submit",
-       "category":"API Bug","environment":"Production","error_code":500}'
-```
+Severity is predicted from the description when you leave it to the model, but that model is at chance level on this dataset (see the verdict above), so supplying severity yourself gives the priority model a far better feature.
 
 ---
 
@@ -584,12 +580,12 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 |---|---|---|
 | `ModuleNotFoundError: No module named 'matplotlib'` (or pandas/sklearn/seaborn) | Running with system Python instead of the venv | Activate the venv (`venv\Scripts\activate`) or call `venv\Scripts\python.exe` directly. The scripts print the exact command. |
 | No charts appear, no error | Charts were saved but not opened | They're in `visualizations/`. Auto-open is on by default; `--no-open` disables it. |
-| Dashboard opens blank or unstyled | The HTML was moved but is otherwise fine — it needs no sibling files | Re-run `python src/08_dashboard.py`. The file is fully self-contained; CSS, JS and the bug table are inlined at build time. |
-| Dashboard stuck on &ldquo;Decoding … records&rdquo; | The embedded payload failed to parse | Rebuild with `python src/08_dashboard.py`; check the browser console for the error. |
-| Triage console says &ldquo;Offline mode&rdquo; | The page was opened as a file, not served | That is the normal fallback and still works. For live model inference run `python src/09_serve.py`. |
-| Header badge stays &ldquo;Offline build&rdquo; while served | `models/*.pkl` did not load | Check the `09_serve.py` banner — it prints why. Usually `python src/05_modeling.py` hasn't been run. |
-| `[ERROR] Could not bind 127.0.0.1:8000` | Port already in use | `python src/09_serve.py --port 8080` |
-| Dashboard file is too big to email | 50k rows are embedded by default | `python src/08_dashboard.py --sample 15000` — the KPIs still cover all rows, only the interactive slice shrinks. |
+| `ModuleNotFoundError: No module named 'streamlit'` (or plotly) | The dashboard dependencies aren't installed | `pip install -r requirements.txt` — stages 1–8 don't need them, the dashboard does. |
+| Dashboard says a data file is missing | That pipeline stage hasn't run yet | `run_dashboard.py` prints the exact command that produces each missing file. |
+| `Port 8501 is already in use` | Another Streamlit app is running | `python run_dashboard.py --port 8600` |
+| Triage console reports the models could not be loaded | `models/*.pkl` missing or unreadable | It names the file. Usually `python src/05_modeling.py` hasn't been run. |
+| The *Agreement* tab takes a minute | It is loading a ~110 MB model and scoring 50,000 rows | That is expected on first use; the result is cached for the rest of the session. |
+| The dashboard feels stale after re-running the pipeline | Streamlit caches the loaded data per server process | Press `R` in the browser, or use *Rerun* → *Clear cache* from the ☰ menu. |
 | Pipeline appears to freeze after Task 8 | Stage 7's chart window is modal, so a direct `python src/07_bug_triage.py` waits for you to close it | Close the chart window. `run_pipeline.py` passes `--no-open` to stage 7 for exactly this reason, so the full run never blocks. |
 | `[ERROR] ... is missing: sprint, module, ...` from stage 08 | `bug_reports_processed.csv` predates the delivery fields | Re-run stages 01 and 02, then 08. |
 | `[ERROR] Dataset not found` | `bug_dataset_50k.csv` missing, or `01_data_collection.py` hasn't run yet | Download the CSV into `data/`, then run stage 01. The error prints the absolute path it looked for. |
@@ -603,6 +599,5 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 - **Data:** Pandas, NumPy
 - **ML:** scikit-learn (TF-IDF, Naïve Bayes, Logistic Regression, Decision Tree, Random Forest, SVM)
 - **Visualization:** Matplotlib, Seaborn (static companion PNGs)
-- **Dashboard:** self-contained HTML + vanilla JS/SVG — no charting library, no CDN, works offline; the bug table ships as base64 typed arrays and is cross-filtered client-side
-- **Live serving:** Python standard library `http.server` — no web framework
+- **Dashboard:** Streamlit (six views, cached slices, in-process model inference) with Plotly charts on the project's validated palette
 - **Persistence:** joblib (model serialization)
