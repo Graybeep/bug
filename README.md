@@ -601,3 +601,5 @@ These are properties of the source dataset itself, not bugs in this repo's code 
 - **Visualization:** Matplotlib, Seaborn (static companion PNGs)
 - **Dashboard:** Streamlit (six views, cached slices, in-process model inference) with Plotly charts on the project's validated palette
 - **Persistence:** joblib (model serialization)
+#   I n t e l l i g e n t - S o f t w a r e - D e f e c t - T r a c k i n g - S y s t e m - w i t h - R e s o l u t i o n - A s s i s t a n c e  
+ 
