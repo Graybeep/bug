@@ -1,0 +1,282 @@
+{
+  "generated_from": "data/bug_reports_enriched.csv",
+  "as_of": "2026-02-02",
+  "total_bugs": 50000,
+  "closed_bugs": 14148,
+  "open_bugs": 35852,
+  "resolution_time_hours_overall": {
+    "mean": 402.83,
+    "median": 216.0,
+    "p75": 528.0,
+    "p90": 1008.0,
+    "max": 7464.0
+  },
+  "bugs_by_module": {
+    "Core Services": {
+      "Bugs": 8477,
+      "Share_%": 16.95
+    },
+    "Delivery Pipeline": {
+      "Bugs": 8364,
+      "Share_%": 16.73
+    },
+    "Cloud Infrastructure": {
+      "Bugs": 8322,
+      "Share_%": 16.64
+    },
+    "Mobile App": {
+      "Bugs": 8311,
+      "Share_%": 16.62
+    },
+    "Data Platform": {
+      "Bugs": 8301,
+      "Share_%": 16.6
+    },
+    "Web Portal": {
+      "Bugs": 8225,
+      "Share_%": 16.45
+    }
+  },
+  "bugs_by_root_cause": {
+    "Memory Leak": {
+      "Bugs": 3220,
+      "Share_%": 6.44
+    },
+    "Logging Bug": {
+      "Bugs": 3194,
+      "Share_%": 6.39
+    },
+    "Cloud Configuration Bug": {
+      "Bugs": 3181,
+      "Share_%": 6.36
+    },
+    "UI Bug": {
+      "Bugs": 3167,
+      "Share_%": 6.33
+    },
+    "Deployment Bug": {
+      "Bugs": 3153,
+      "Share_%": 6.31
+    },
+    "Authorization Bug": {
+      "Bugs": 3152,
+      "Share_%": 6.3
+    },
+    "API Bug": {
+      "Bugs": 3141,
+      "Share_%": 6.28
+    },
+    "Concurrency Bug": {
+      "Bugs": 3130,
+      "Share_%": 6.26
+    },
+    "Security Vulnerability": {
+      "Bugs": 3121,
+      "Share_%": 6.24
+    },
+    "Monitoring Bug": {
+      "Bugs": 3121,
+      "Share_%": 6.24
+    },
+    "Performance Bug": {
+      "Bugs": 3100,
+      "Share_%": 6.2
+    },
+    "Backend Logic Bug": {
+      "Bugs": 3095,
+      "Share_%": 6.19
+    },
+    "Authentication Bug": {
+      "Bugs": 3083,
+      "Share_%": 6.17
+    },
+    "Database Bug": {
+      "Bugs": 3082,
+      "Share_%": 6.16
+    },
+    "CI/CD Bug": {
+      "Bugs": 3075,
+      "Share_%": 6.15
+    },
+    "Frontend Routing Bug": {
+      "Bugs": 2985,
+      "Share_%": 5.97
+    }
+  },
+  "resolution_by_module": {
+    "Data Platform": {
+      "Closed": 2363,
+      "Mean_Hours": 422.4,
+      "Median_Hours": 240.0,
+      "P90_Hours": 1080.0,
+      "Max_Hours": 6024.0,
+      "vs_Overall_h": 19.6
+    },
+    "Core Services": {
+      "Closed": 2379,
+      "Mean_Hours": 411.5,
+      "Median_Hours": 216.0,
+      "P90_Hours": 984.0,
+      "Max_Hours": 6984.0,
+      "vs_Overall_h": 8.7
+    },
+    "Web Portal": {
+      "Closed": 2352,
+      "Mean_Hours": 410.0,
+      "Median_Hours": 240.0,
+      "P90_Hours": 1008.0,
+      "Max_Hours": 5208.0,
+      "vs_Overall_h": 7.2
+    },
+    "Mobile App": {
+      "Closed": 2408,
+      "Mean_Hours": 393.0,
+      "Median_Hours": 216.0,
+      "P90_Hours": 960.0,
+      "Max_Hours": 6168.0,
+      "vs_Overall_h": -9.8
+    },
+    "Delivery Pipeline": {
+      "Closed": 2320,
+      "Mean_Hours": 390.3,
+      "Median_Hours": 216.0,
+      "P90_Hours": 984.0,
+      "Max_Hours": 7464.0,
+      "vs_Overall_h": -12.6
+    },
+    "Cloud Infrastructure": {
+      "Closed": 2326,
+      "Mean_Hours": 389.5,
+      "Median_Hours": 216.0,
+      "P90_Hours": 960.0,
+      "Max_Hours": 5184.0,
+      "vs_Overall_h": -13.3
+    }
+  },
+  "resolution_by_root_cause": {
+    "Backend Logic Bug": {
+      "Closed": 860,
+      "Mean_Hours": 443.2,
+      "Median_Hours": 240.0,
+      "P90_Hours": 1080.0,
+      "vs_Overall_h": 40.4
+    },
+    "CI/CD Bug": {
+      "Closed": 935,
+      "Mean_Hours": 426.2,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1032.0,
+      "vs_Overall_h": 23.4
+    },
+    "Authentication Bug": {
+      "Closed": 882,
+      "Mean_Hours": 416.5,
+      "Median_Hours": 240.0,
+      "P90_Hours": 1029.6,
+      "vs_Overall_h": 13.7
+    },
+    "Performance Bug": {
+      "Closed": 904,
+      "Mean_Hours": 413.6,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1048.8,
+      "vs_Overall_h": 10.7
+    },
+    "API Bug": {
+      "Closed": 928,
+      "Mean_Hours": 407.5,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1032.0,
+      "vs_Overall_h": 4.6
+    },
+    "Memory Leak": {
+      "Closed": 868,
+      "Mean_Hours": 407.2,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1032.0,
+      "vs_Overall_h": 4.4
+    },
+    "Authorization Bug": {
+      "Closed": 879,
+      "Mean_Hours": 406.1,
+      "Median_Hours": 240.0,
+      "P90_Hours": 984.0,
+      "vs_Overall_h": 3.3
+    },
+    "Monitoring Bug": {
+      "Closed": 874,
+      "Mean_Hours": 403.7,
+      "Median_Hours": 204.0,
+      "P90_Hours": 984.0,
+      "vs_Overall_h": 0.9
+    },
+    "Frontend Routing Bug": {
+      "Closed": 882,
+      "Mean_Hours": 402.8,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1008.0,
+      "vs_Overall_h": 0.0
+    },
+    "Logging Bug": {
+      "Closed": 899,
+      "Mean_Hours": 399.5,
+      "Median_Hours": 216.0,
+      "P90_Hours": 984.0,
+      "vs_Overall_h": -3.4
+    },
+    "Security Vulnerability": {
+      "Closed": 875,
+      "Mean_Hours": 398.8,
+      "Median_Hours": 216.0,
+      "P90_Hours": 984.0,
+      "vs_Overall_h": -4.0
+    },
+    "Concurrency Bug": {
+      "Closed": 853,
+      "Mean_Hours": 397.2,
+      "Median_Hours": 216.0,
+      "P90_Hours": 1008.0,
+      "vs_Overall_h": -5.7
+    },
+    "Cloud Configuration Bug": {
+      "Closed": 904,
+      "Mean_Hours": 393.8,
+      "Median_Hours": 216.0,
+      "P90_Hours": 960.0,
+      "vs_Overall_h": -9.1
+    },
+    "Deployment Bug": {
+      "Closed": 859,
+      "Mean_Hours": 384.4,
+      "Median_Hours": 192.0,
+      "P90_Hours": 936.0,
+      "vs_Overall_h": -18.4
+    },
+    "UI Bug": {
+      "Closed": 898,
+      "Mean_Hours": 382.4,
+      "Median_Hours": 216.0,
+      "P90_Hours": 919.2,
+      "vs_Overall_h": -20.4
+    },
+    "Database Bug": {
+      "Closed": 848,
+      "Mean_Hours": 359.9,
+      "Median_Hours": 192.0,
+      "P90_Hours": 864.0,
+      "vs_Overall_h": -43.0
+    }
+  },
+  "charts": {
+    "bugs_by_module": "visualizations/analysis_bugs_by_module.png",
+    "root_cause": "visualizations/analysis_root_cause_distribution.png",
+    "avg_resolution": "visualizations/analysis_avg_resolution_by_module.png",
+    "delay_heatmap": "visualizations/analysis_resolution_heatmap.png",
+    "resolution_spread": "visualizations/analysis_resolution_time_distribution.png"
+  },
+  "notes": [
+    "Resolution_Time_Hours = (Date_Closed - Date_Reported) in hours.",
+    "Both dates are stored at day granularity, so hours are exact to the day (days x 24), not to the clock time of closure.",
+    "Timing statistics cover closed bugs only; open bugs are reported separately as an ageing backlog."
+  ]
+}
